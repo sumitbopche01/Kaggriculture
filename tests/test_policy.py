@@ -202,21 +202,43 @@ class FeedAndWheatTests(unittest.TestCase):
         s = make_s(
             n_quads=2,
             day=8,
+            hour=0,
             cows=2,
             sheep=2,
             geese=0,
             crops={"WHEAT": 8},
             shed={"WHEAT": 6},
             shops=["BAKERY"],
+            prices={**M.BASE_PRICE, "EGG": 120},
         )
         self.assertGreaterEqual(M.want_geese(s), 1)
         market: list = []
         s["empty"] = 8
         M._buy_animals(market, 5000, s)
-        self.assertFalse(
+        self.assertTrue(
             any(a and a[0] == "BUY_ANIMAL" and a[1] == "GOOSE" for a in market),
-            "geese buys starve berry/herd maps; want_geese is advisory only",
+            "bakery/egg demand should trigger goose diversification",
         )
+
+    def test_bakery_wants_geese_at_moderate_egg_price(self):
+        """EV gate should allow geese below the old px>=80 hard floor."""
+        s = make_s(
+            n_quads=2,
+            day=8,
+            hour=0,
+            cows=2,
+            sheep=2,
+            geese=0,
+            crops={"WHEAT": 8},
+            shed={"WHEAT": 6},
+            shops=["BAKERY"],
+            prices={**M.BASE_PRICE, "EGG": 55},
+        )
+        s["a_scores"] = {
+            a: M.animal_score(a, s["prices"][M.ANIMAL_PRODUCT[a]], 8)
+            for a in M.ANIMAL_COST
+        }
+        self.assertGreaterEqual(M.want_geese(s), 1)
 
 
 class CropPlanTests(unittest.TestCase):
@@ -224,7 +246,9 @@ class CropPlanTests(unittest.TestCase):
         s = make_s(day=6, n_quads=1, cows=2, sheep=2, shops=["FARMERS_MARKET"], empty=0)
         plan = M.crop_plan(s)
         self.assertGreaterEqual(plan["STRAWBERRY"], 8)
-        self.assertLessEqual(plan["CARROT"], 2)
+        # With shop-adaptive allocation, carrots can be filled more than the old
+        # berry-first heuristic cap.
+        self.assertLessEqual(plan["CARROT"], 4)
 
     def test_berry_cap_scales_with_land(self):
         s1 = make_s(n_quads=1, shops=["SMOOTHIE_SHOP"])
@@ -398,10 +422,11 @@ class SprintAndReplantTests(unittest.TestCase):
         )
         market = M.market_for(s, "ENGINE")
         land_i = next(i for i, a in enumerate(market) if a and a[0] == "BUY_LAND")
-        berry_before = any(
-            a and a[0] == "BUY_SEED" and a[1] == "STRAWBERRY" for a in market[:land_i]
+        seed_before = any(a and a[0] == "BUY_SEED" for a in market[:land_i])
+        self.assertTrue(
+            seed_before,
+            f"market order should seed cash crops before land (shop-adaptive), got: {market}",
         )
-        self.assertTrue(berry_before, f"market order should seed berries before land: {market}")
         hires_before = sum(1 for a in market[:land_i] if a and a[0] == "HIRE")
         self.assertGreaterEqual(hires_before, 1)
 

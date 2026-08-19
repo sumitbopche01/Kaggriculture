@@ -8,6 +8,9 @@ outrank feed, hires, or leftover operating cash.
 
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
 from typing import Any
 
 HARVEST_AGE = {"WHEAT": 4, "CARROT": 3, "MELON": 10}
@@ -67,6 +70,81 @@ OPENING_MARKET = [
     ["BUY_SEED", "WHEAT", 7],
     ["BUY_PRODUCT", "WHEAT", 6],
 ]
+
+DEFAULT_PARAMS: dict[str, int | float] = {
+    # Slice A wheat engine
+    "wheat_engine_day_max": 20,
+    "wheat_buffer_add": 2,
+    "wheat_min_tiles": 6,
+    "wheat_no_mouth_tiles": 4,
+    "wheat_filler_day_max": 20,
+    "late_wheat_seed_buffer_day_min": 16,
+    "late_wheat_seed_buffer": 2,
+
+    # Melon filler (only when berries exist)
+    "melon_leftover_min": 8,
+    "melon_n_quads_min": 3,
+    "melon_day_max": 16,
+
+    # Herd ramp gates
+    "cow_day_max": 20,
+    "cow_milk_px_min": 80,
+    "cow_floor_day_max": 20,
+    "cow_floor": 2,
+    "cow_expand_cap": 10,
+
+    "sheep_day_max": 20,
+    "sheep_wool_px_min": 80,
+    "sheep_floor_day_max": 20,
+    "sheep_floor": 2,
+    "sheep_expand_cap": 4,
+
+    # Land timing / guards
+    "land_day_min": 6,
+    "land_day_max": 22,
+    "max_quads_for_land": 3,
+    "land2_day_min": 11,
+    "land2_money_min": 4000,
+    "land2_empty_max": 4,
+    "land2_strawberry_min": 16,
+
+    # Sell-hold heuristic
+    "sell_hold_price_factor": 0.82,
+    "sell_hold_days_left_min": 7,  # days_left(day) > 6
+
+    # Animal buy caps
+    "animal_buy_day_max": 20,
+    "animal_buy_day_min": 3,
+    "mouth_cap_1q": 6,
+    "mouth_cap_2qplus": 14,
+    "animal_cash_floor_2qplus": 400,
+    "animal_cash_floor_1q": 1200,
+}
+
+
+def _load_params() -> dict[str, int | float]:
+    """
+    Load tuning params from either:
+      - $KAGGRICULTURE_PARAMS_PATH (explicit), or
+      - ./tune/params.json (default; optional)
+    """
+    params = dict(DEFAULT_PARAMS)
+    try:
+        path = os.getenv("KAGGRICULTURE_PARAMS_PATH") or str(
+            Path(__file__).resolve().parent / "tune" / "params.json"
+        )
+        if os.path.exists(path):
+            raw = json.loads(Path(path).read_text(encoding="utf-8"))
+            for k, v in raw.items():
+                if k in params:
+                    params[k] = v
+    except Exception:
+        # Tuning is optional; if loading fails we keep defaults.
+        pass
+    return params
+
+
+PARAMS: dict[str, int | float] = _load_params()
 
 _PRICE_BOOK: dict[str, Any] = {"prev": {}, "delta": {}, "hist": {}}
 
@@ -155,6 +233,13 @@ def plant_sprint(s: dict[str, Any]) -> bool:
 
 def berry_replant_push(s: dict[str, Any]) -> bool:
     return 12 <= s["day"] <= 26 and berry_ok(s) and berry_gap(s) > 0
+
+
+def seed_fill_push(s: dict[str, Any]) -> bool:
+    """Buy/plant aggressively after land buys or when many tiles sit empty."""
+    if s["day"] > 22:
+        return False
+    return plant_sprint(s) or s["empty"] >= 10
 
 
 def berry_ramp(s: dict[str, Any]) -> bool:
@@ -285,10 +370,14 @@ def tile_budget(s: dict[str, Any]) -> tuple[int, int, int]:
     mouths = mouths_of(s)
     # Slice A: keep wheat ahead of mouths (`mouths + 2`) early on
     # so `herd_can_expand()` can flip once the 2nd land buys land/animals.
-    if mouths and s["day"] <= 20:
-        wheat_tiles = max(6, mouths + 2)
+    if mouths and s["day"] <= PARAMS["wheat_engine_day_max"]:
+        wheat_tiles = max(
+            PARAMS["wheat_min_tiles"], mouths + PARAMS["wheat_buffer_add"]
+        )
     else:
-        wheat_tiles = max(6, mouths) if mouths else 4
+        wheat_tiles = (
+            max(PARAMS["wheat_min_tiles"], mouths) if mouths else PARAMS["wheat_no_mouth_tiles"]
+        )
     cash_room = max(0, tiles - mouths - wheat_tiles)
     return tiles, cash_room, wheat_tiles
 
@@ -307,8 +396,8 @@ def berry_tile_cap(s: dict[str, Any]) -> int:
 def crop_plan(s: dict[str, Any]) -> dict[str, int]:
     """How many tiles of each crop to hold.
 
-    Shops first. If no berry shop exists yet (Slice A), fill leftover tiles
-    with wheat instead of melon so wheat stays ahead of herd mouths.
+    Allocate cash tiles to the most profitable cash crops available from the
+    currently open shops (and melon as an EV-based fallback).
     """
     _, room, wheat_tiles = tile_budget(s)
     plan = {c: 0 for c in SEED_COST}
@@ -324,31 +413,45 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
         plan[crop] = n
         leftover -= n
 
+    candidates: list[str] = []
     if demand.get("STRAWBERRY", 0) >= 1 and s["day"] <= 26:
-        take("STRAWBERRY", berry_tile_cap(s))
+        candidates.append("STRAWBERRY")
     if demand.get("CARROT", 0) >= 1 and s["day"] <= 26:
-        carrot_cap = 2 if berry_sink(s) else 8
-        take("CARROT", carrot_cap)
-    if demand.get("TOMATO", 0) >= 1 and s["day"] <= 24 and berry_sink(s) == 0:
-        tomato_cap = 4 if s["n_quads"] == 1 else 8
-        take("TOMATO", tomato_cap)
-
-    # Slice A wheat filler (no berries yet).
-    if berry_sink(s) == 0 and s["day"] <= 20 and leftover > 0:
-        # `take()` overwrites plan[crop], so add to the wheat floor directly.
-        plan["WHEAT"] += leftover
-        leftover = 0
-        return plan
-
-    # Melon filler only after berries exist.
+        candidates.append("CARROT")
+    if demand.get("TOMATO", 0) >= 1 and s["day"] <= 24:
+        candidates.append("TOMATO")
     if (
-        leftover >= 8
-        and s["n_quads"] >= 3
-        and s["day"] <= 16
-        and berry_sink(s) > 0
+        leftover >= PARAMS["melon_leftover_min"]
+        and s["n_quads"] >= PARAMS["melon_n_quads_min"]
+        and s["day"] <= PARAMS["melon_day_max"]
         and live_ev(s, "MELON") > live_ev(s, "WHEAT")
     ):
-        take("MELON", min(8, leftover))
+        candidates.append("MELON")
+
+    # Greedily allocate cash tiles by profitability.
+    candidates.sort(key=lambda c: s["scores"].get(c, 0.0), reverse=True)
+    for crop in candidates:
+        if leftover <= 0:
+            break
+        if crop == "STRAWBERRY":
+            take("STRAWBERRY", berry_tile_cap(s))
+        elif crop == "CARROT":
+            carrot_cap = 4 if s["n_quads"] == 1 else 8
+            take("CARROT", carrot_cap)
+        elif crop == "TOMATO":
+            tomato_cap = 4 if s["n_quads"] == 1 else 8
+            take("TOMATO", tomato_cap)
+        elif crop == "MELON":
+            take("MELON", min(8, leftover))
+
+    # Slice A wheat filler: only when there is no berry shop demand yet.
+    # (This keeps `pick_crop`/plant scheduling aligned with `_buy_wheat_seeds()`.)
+    if (
+        berry_sink(s) == 0
+        and s["day"] <= PARAMS["wheat_filler_day_max"]
+        and leftover > 0
+    ):
+        plan["WHEAT"] += leftover
     return plan
 
 
@@ -370,9 +473,9 @@ def cash_caps(s: dict[str, Any]) -> tuple[int, int]:
 
 
 def want_cows(s: dict[str, Any]) -> int:
-    if s["day"] > 20 or milk_px(s) < 80:
+    if s["day"] > PARAMS["cow_day_max"] or milk_px(s) < PARAMS["cow_milk_px_min"]:
         return s["cows"]
-    floor = 2 if s["day"] <= 20 else 0
+    floor = PARAMS["cow_floor"] if s["day"] <= PARAMS["cow_floor_day_max"] else 0
     if s["cows"] < floor:
         return floor
     if milk_sink(s) == 0:
@@ -381,13 +484,13 @@ def want_cows(s: dict[str, Any]) -> int:
         return s["cows"]
     if not herd_can_expand(s):
         return s["cows"]
-    return min(s["cows"] + 1, 10)
+    return min(s["cows"] + 1, PARAMS["cow_expand_cap"])
 
 
 def want_sheep(s: dict[str, Any]) -> int:
-    if s["day"] > 20 or wool_px(s) < 80:
+    if s["day"] > PARAMS["sheep_day_max"] or wool_px(s) < PARAMS["sheep_wool_px_min"]:
         return s["sheep"]
-    floor = 2 if s["day"] <= 20 else 0
+    floor = PARAMS["sheep_floor"] if s["day"] <= PARAMS["sheep_floor_day_max"] else 0
     if s["sheep"] < floor:
         return floor
     if s["demand"].get("WOOL", 0) <= 0:
@@ -396,23 +499,37 @@ def want_sheep(s: dict[str, Any]) -> int:
         return s["sheep"]
     if not herd_can_expand(s):
         return s["sheep"]
-    return min(s["sheep"] + 1, 4)
+    return min(s["sheep"] + 1, PARAMS["sheep_expand_cap"])
 
 
 def want_geese(s: dict[str, Any]) -> int:
     if s["day"] > 20 or egg_sink(s) == 0:
         return s["geese"]
-    if s["geese"] >= 2:
+    egg_px = px(s, "EGG")
+    goose_ev = animal_score("GOOSE", egg_px, s["day"])
+    # Saturated egg-shop maps (2× bakery + brunch) need cash for berries, not geese.
+    if egg_sink(s) >= 3 and egg_px < 80:
+        return s["geese"]
+    if egg_px < 55 or goose_ev <= 12:
+        return s["geese"]
+    if egg_px < 80 and goose_ev <= 15:
+        return s["geese"]
+    max_geese = 1 if s["n_quads"] <= 2 else 2
+    if s["geese"] >= max_geese:
         return s["geese"]
     if s["n_quads"] == 1 and mouths_of(s) >= 4:
         return s["geese"]
     if not herd_can_expand(s):
         return s["geese"]
-    return min(s["geese"] + 1, 2)
+    return min(s["geese"] + 1, max_geese)
 
 
 def need_land(s: dict[str, Any]) -> bool:
-    if s["day"] < 6 or s["day"] >= 22 or s["n_quads"] >= 3:
+    if (
+        s["day"] < PARAMS["land_day_min"]
+        or s["day"] >= PARAMS["land_day_max"]
+        or s["n_quads"] >= PARAMS["max_quads_for_land"]
+    ):
         return False
     if s["n_quads"] == 1 and s["empty"] > 10:
         return False
@@ -428,13 +545,13 @@ def need_land(s: dict[str, Any]) -> bool:
             return True
         return False
     if s["n_quads"] == 2:
-        if s["day"] < 11:
+        if s["day"] < PARAMS["land2_day_min"]:
             return False
-        if int(s["money"]) < 4000:
+        if int(s["money"]) < PARAMS["land2_money_min"]:
             return False
-        if s["empty"] > 4:
+        if s["empty"] > PARAMS["land2_empty_max"]:
             return False
-        if berry_ok(s) and s["crops"]["STRAWBERRY"] < 16:
+        if berry_ok(s) and s["crops"]["STRAWBERRY"] < PARAMS["land2_strawberry_min"]:
             return False
         return True
     return False
@@ -580,7 +697,7 @@ def read_signals(obs: dict[str, Any]) -> dict[str, Any]:
 
 
 def pick_mode(s: dict[str, Any]) -> str:
-    if s["day"] >= 27:
+    if s["day"] >= 28:
         return "LIQUIDATE"
     return "ENGINE"
 
@@ -620,8 +737,6 @@ def pick_crop(s: dict[str, Any], seeds: dict[str, int]) -> str | None:
         if seeds.get(crop, 0) > 0 and s["crops"][crop] < plan.get(crop, 0)
     ]
     if cash:
-        if "STRAWBERRY" in cash:
-            return "STRAWBERRY"
         return max(cash, key=lambda c: s["scores"].get(c, 0.0))
     if (
         berry_ok(s)
@@ -974,7 +1089,11 @@ def _buy_wheat_seeds(market: list, afford: int, s: dict[str, Any], seeds: dict[s
     _, _, wheat_tiles = tile_budget(s)
     # Keep a small wheat seed buffer for late-game days so harvested wheat
     # gets replanted before the next morning market decisions.
-    buffer = 2 if s["day"] >= 16 and mouths_of(s) > 0 else 0
+    buffer = (
+        PARAMS["late_wheat_seed_buffer"]
+        if s["day"] >= PARAMS["late_wheat_seed_buffer_day_min"] and mouths_of(s) > 0
+        else 0
+    )
     wheat_tiles += buffer
     have_w = s["crops"]["WHEAT"] + seeds.get("WHEAT", 0)
     if have_w >= wheat_tiles:
@@ -1022,7 +1141,8 @@ def _buy_planned_seeds(
     berry_only: bool = False,
 ) -> int:
     plan = crop_plan(s)
-    cap_n = 8 if berry_sink(s) else 4
+    cash_planned = any(plan.get(c, 0) > 0 for c in CASH_PLANT)
+    cap_n = 8 if cash_planned else 4
     if s["n_quads"] >= 2 and afford >= 1600:
         cap_n = 12
     if s["n_quads"] >= 3 and afford >= 2000:
@@ -1031,9 +1151,14 @@ def _buy_planned_seeds(
         cap_n = max(cap_n, 16)
     elif berry_ramp(s):
         cap_n = max(cap_n, 8)
-    order = [c for c in ("STRAWBERRY", "CARROT", "TOMATO", "MELON") if plan.get(c, 0) > 0]
+    if seed_fill_push(s):
+        cap_n = max(cap_n, min(16, s["empty"]))
+    order = [c for c in CASH_PLANT if plan.get(c, 0) > 0]
+    order.sort(key=lambda c: s["scores"].get(c, 0.0), reverse=True)
+    fill_push = seed_fill_push(s)
     if berry_only:
-        order = [c for c in order if c == "STRAWBERRY"]
+        # Conservative mode: one crop unless land-sprint fill needs diversity.
+        order = order[:2 if plant_sprint(s) else 1]
     for crop in order:
         have = s["crops"][crop] + seeds.get(crop, 0)
         need = plan[crop] - have
@@ -1044,10 +1169,14 @@ def _buy_planned_seeds(
                 keep = 200
             else:
                 keep = 400 if s["n_quads"] >= 2 else 800
+            if plant_sprint(s):
+                keep = min(keep, 200)
+            elif s["empty"] >= 12:
+                keep = min(keep, 120)
             if berry_only:
                 need = max(need, min(8, max(4, berry_gap(s) + 2)))
         else:
-            keep = 800
+            keep = 200 if plant_sprint(s) else 800
         if need > 0:
             if not berry_only and crop != "STRAWBERRY" and len(market) >= MARKET_LIMIT:
                 continue
@@ -1062,9 +1191,9 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     below_floor = s["cows"] < 2 or s["sheep"] < 2
     if s["hour"] != 0 and not below_floor:
         return afford
-    if s["day"] >= 20 and not below_floor:
+    if s["day"] >= PARAMS["animal_buy_day_max"] and not below_floor:
         return afford
-    if s["day"] < 3 and not below_floor:
+    if s["day"] < PARAMS["animal_buy_day_min"] and not below_floor:
         return afford
     if s["shed"].get("COW", 0) or s["shed"].get("SHEEP", 0) or s["shed"].get("GOOSE", 0):
         return afford
@@ -1075,7 +1204,7 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     if not below_floor and mouths_of(s) >= s["crops"]["WHEAT"]:
         return afford
     _, cash_room, _ = tile_budget(s)
-    mouth_cap = 6 if s["n_quads"] == 1 else 14
+    mouth_cap = PARAMS["mouth_cap_1q"] if s["n_quads"] == 1 else PARAMS["mouth_cap_2qplus"]
     if mouths_of(s) >= mouth_cap:
         return afford
     if s["n_quads"] == 1 and cash_shop(s) and cash_room < 6 and not below_floor:
@@ -1084,28 +1213,55 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     reserve = min(900, seed_gap * SEED_COST["STRAWBERRY"])
     if below_floor:
         reserve = min(reserve, 200)
-    cash_floor = 400 if s["n_quads"] >= 2 else 1200
-    if afford - ANIMAL_COST["COW"] < max(reserve, cash_floor) and not below_floor:
+    cash_floor = (
+        PARAMS["animal_cash_floor_2qplus"] if s["n_quads"] >= 2 else PARAMS["animal_cash_floor_1q"]
+    )
+    # When only diversification (e.g. GOOSE) is eligible, we should not
+    # accidentally gate on cow-cost.
+    need_kinds: list[str] = []
+    if want_cows(s) > s["cows"]:
+        need_kinds.append("COW")
+    if want_sheep(s) > s["sheep"]:
+        need_kinds.append("SHEEP")
+    if want_geese(s) > s["geese"]:
+        need_kinds.append("GOOSE")
+    min_unit = min((ANIMAL_COST[k] for k in need_kinds), default=ANIMAL_COST["COW"])
+    if afford - min_unit < max(reserve, cash_floor) and not below_floor:
         return afford
+    # Buy the most valuable eligible animal first (milk/wool/egg).
+    candidates: list[tuple[str, int, int]] = []
     for kind, want, have in (
         ("COW", want_cows(s), s["cows"]),
         ("SHEEP", want_sheep(s), s["sheep"]),
+        ("GOOSE", want_geese(s), s["geese"]),
     ):
         need = want - have
-        unit = ANIMAL_COST[kind]
-        if need <= 0 or afford < unit or s["empty"] < 2:
+        if need <= 0 or afford < ANIMAL_COST[kind] or s["empty"] < 2:
             continue
+        if kind == "GOOSE" and not herd_can_expand(s):
+            # Geese are the highest-risk diversification; only buy them when
+            # wheat reserves are healthy enough to expand herd feeding.
+            continue
+        out_item = {"COW": "MILK", "SHEEP": "WOOL", "GOOSE": "EGG"}[kind]
+        candidates.append((kind, need, px(s, out_item)))
+
+    # Sort by expected sell price so we diversify toward the best shop-map.
+    candidates.sort(key=lambda t: t[2], reverse=True)
+    for kind, want_need, _price in candidates:
+        unit = ANIMAL_COST[kind]
         if mouths_of(s) + 1 > mouth_cap:
             continue
-        n = min(need, 1, afford // unit)
+        n = min(want_need, 1, afford // unit)
         if n <= 0:
             continue
         market.append(["BUY_ANIMAL", kind, n])
         afford -= n * unit
         if kind == "COW":
             s["cows"] += n
-        else:
+        elif kind == "SHEEP":
             s["sheep"] += n
+        else:
+            s["geese"] += n
         break
     return afford
 
@@ -1124,10 +1280,18 @@ def _keep_fert(s: dict[str, Any]) -> int:
 
 def _sell_score(s: dict[str, Any], item: str, n: int) -> int:
     price = px(s, item)
-    if item in ("STRAWBERRY", "MILK", "WOOL") and days_left(s["day"]) > 6:
+    if (
+        item in ("STRAWBERRY", "MILK", "WOOL")
+        and days_left(s["day"]) >= PARAMS["sell_hold_days_left_min"]
+    ):
         hist = float(s.get("mean3", {}).get(item, price) or price)
-        if hist > 0 and price < hist * 0.82:
-            return 0
+        if hist > 0 and price < hist * PARAMS["sell_hold_price_factor"]:
+            # If the market is moving up (positive delta), sell instead of
+            # holding through a likely bounce.
+            delta = int(s.get("delta", {}).get(item, 0) or 0)
+            days_left_v = days_left(s["day"])
+            if not (delta > 0 and days_left_v <= PARAMS["sell_hold_days_left_min"] + 3):
+                return 0
     return n * price
 
 
@@ -1174,7 +1338,7 @@ def _start_market(s: dict[str, Any], mode: str) -> tuple[list, int, dict[str, An
         sell_n = 3
     proceeds = _sell_goods(market, s2, shed, max_actions=sell_n)
     wheat = shed.get("WHEAT", 0)
-    if (mode == "LIQUIDATE" or s2["day"] >= 27) and wheat > 0:
+    if (mode == "LIQUIDATE" or s2["day"] >= 28) and wheat > 0:
         market.append(["SELL", "WHEAT", wheat])
         proceeds += wheat * px(s2, "WHEAT")
         shed["WHEAT"] = 0
@@ -1228,7 +1392,7 @@ def _pack_market(market: list, limit: int = MARKET_LIMIT) -> list:
             return (1, 0)
         if op == "BUY_PRODUCT" and act[1] == "WHEAT":
             return (2, 0)
-        if op == "BUY_SEED" and act[1] == "STRAWBERRY":
+        if op == "BUY_SEED" and act[1] in CASH_PLANT:
             return (3, 0)
         if op == "HIRE":
             return (4, 0)
@@ -1257,7 +1421,7 @@ def _pack_market(market: list, limit: int = MARKET_LIMIT) -> list:
 
     force(lambda a: a and a[0] == "BUY_LAND")
     force(lambda a: a and a[0] == "BUY_PRODUCT" and a[1] == "WHEAT")
-    force(lambda a: a and a[0] == "BUY_SEED" and a[1] == "STRAWBERRY")
+    force(lambda a: a and a[0] == "BUY_SEED" and a[1] in CASH_PLANT)
     force(lambda a: a and a[0] == "BUY_SEED" and a[1] == "WHEAT")
     return [act for i, act in enumerate(market) if i in keep]
 
@@ -1278,7 +1442,7 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         return _pack_market(market)
 
     can_land = _will_buy_land(s2, afford)
-    prep_land = can_land and berry_ok(s2)
+    prep_land = can_land and cash_shop(s2)
     if prep_land:
         hire_n = _hire_budget(s2, market, reserve_land=True)
         afford = _hire_up_to(market, afford, s2, hire_n)
@@ -1289,11 +1453,17 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         hire_n = _hire_budget(s2, market, reserve_land=False)
         afford = _hire_up_to(market, afford, s2, hire_n)
         if berry_ramp(s2):
-            afford = _buy_planned_seeds(market, afford, s2, s2["seeds"], berry_only=True)
+            ramp_conservative = not seed_fill_push(s2)
+            afford = _buy_planned_seeds(
+                market, afford, s2, s2["seeds"], berry_only=ramp_conservative
+            )
     afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
     afford = _buy_planned_seeds(market, afford, s2, s2["seeds"])
     afford = _buy_feed_wheat(market, afford, s2)
-    if afford >= 1200 and len(market) < MARKET_LIMIT:
+    defer_animals = (
+        s2["empty"] >= 12 and s2["day"] <= 18 and berry_gap(s2) > 0
+    )
+    if afford >= 1200 and len(market) < MARKET_LIMIT and not defer_animals:
         _buy_animals(market, afford, s2)
     return _pack_market(market)
 
