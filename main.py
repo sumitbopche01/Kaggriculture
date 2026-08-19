@@ -107,7 +107,35 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     # Sell-hold heuristic
     "sell_hold_price_factor": 0.82,
     "sell_hold_days_left_min": 7,  # days_left(day) > 6
-    # Animal buy caps
+    # P0 regime: ongoing late-game + spike sell + soft cap override
+    "ongoing_min_days_left": 3,
+    "ongoing_spike_price_factor": 2.5,
+    "spike_sell_base_mult": 3.0,
+    "spike_sell_ma_mult": 1.5,
+    "cap_override_ev_mult": 2.0,
+    "cap_override_bonus_max": 4,
+    "cap_override_price_factor": 2.0,
+    # P1: duplicate-shop demand scaling
+    "demand_boost_linear": 0.08,
+    "demand_boost_stack": 0.04,
+    "demand_cap_step_berry": 4,
+    "demand_cap_step_crop": 2,
+    "milk_herd_base": 2,
+    "wool_herd_base": 2,
+    # P2: phase system + late shop sprint + extended windows
+    "liquidate_day_min": 28,
+    "liquidity_rescue_day_max": 26,
+    "seed_fill_day_max": 22,
+    "endgame_days_left": 4,
+    "late_shop_day_min": 12,
+    "late_shop_sprint_days": 4,
+    "late_shop_sprint_cutoff_day": 20,
+    # P3: market intelligence
+    "glut_block_threshold": 0.35,
+    "spike_harvest_mult": 1.35,
+    "frontrun_uptrend_hours": 3,
+    "frontrun_score_mult": 1.2,
+    "frontrun_cap_bonus": 4,
     "animal_buy_day_max": 20,
     "animal_buy_day_min": 3,
     "mouth_cap_1q": 6,
@@ -179,6 +207,9 @@ def update_price_book(s: dict[str, Any]) -> None:
     if s["day"] == 0 and s["hour"] == 0:
         _PRICE_BOOK = {"prev": {}, "delta": {}, "hist": {}}
         _LAND_SPRINT["until_day"] = -1
+        _LATE_SHOP_SPRINT["until_day"] = -1
+        _SHOP_TRACK["prev_shops"] = set()
+        _UPTREND_HOURS.clear()
     prices = {k: int(v) for k, v in s["prices"].items()}
     prev = _PRICE_BOOK.get("prev") or {}
     delta: dict[str, int] = {}
@@ -192,7 +223,7 @@ def update_price_book(s: dict[str, Any]) -> None:
             del series[0]
     _PRICE_BOOK = {"prev": prices, "delta": delta, "hist": hist}
     s["delta"] = delta
-    s["mean3"] = {
+    s["price_ma"] = {
         item: (
             (sum(series[-72:]) / len(series[-72:]))
             if series
@@ -200,6 +231,72 @@ def update_price_book(s: dict[str, Any]) -> None:
         )
         for item, series in hist.items()
     }
+
+
+def price_momentum(s: dict[str, Any], item: str) -> float:
+    """Hourly price trend tilt: ±20% max from last-step delta."""
+    delta = (s.get("delta") or {}).get(item, 0)
+    return 1.0 + max(-0.2, min(0.2, float(delta) / 200.0))
+
+
+def planning_ev(s: dict[str, Any], crop: str) -> float:
+    """EV for plant/buy/harvest: glut-adjusted score × hourly momentum."""
+    return live_ev(s, crop) * price_momentum(s, crop)
+
+
+def refresh_planning_scores(s: dict[str, Any]) -> None:
+    """Recompute planning EV after hourly price book update."""
+    scores = s.get("scores") or {}
+    s["plan_scores"] = {c: planning_ev(s, c) for c in scores}
+
+
+def plan_ev(s: dict[str, Any], crop: str) -> float:
+    """Cached planning EV when available, else compute on the fly."""
+    ps = s.get("plan_scores")
+    if ps is not None and crop in ps:
+        return float(ps[crop])
+    return planning_ev(s, crop)
+
+
+def plan_viable(s: dict[str, Any], crop: str) -> bool:
+    """Glut-aware gate: skip flooded markets unless price is spiking."""
+    if plan_ev(s, crop) <= 0:
+        return False
+    glut_level = glut(s, crop)
+    if glut_level > float(PARAMS["glut_block_threshold"]) and not price_spike(s, crop):
+        return False
+    return True
+
+
+def update_uptrend_tracking(s: dict[str, Any]) -> None:
+    """Count consecutive uptrend hours for high-demand crops."""
+    global _UPTREND_HOURS
+    demand = s.get("demand") or {}
+    delta = s.get("delta") or {}
+    for crop in CASH_PLANT:
+        d = int(demand.get(crop, 0))
+        uptick = int(delta.get(crop, 0) or 0) > 0
+        if d >= 2 and uptick:
+            _UPTREND_HOURS[crop] = _UPTREND_HOURS.get(crop, 0) + 1
+        else:
+            _UPTREND_HOURS[crop] = 0
+
+
+def uptrend_frontrun(s: dict[str, Any], crop: str) -> bool:
+    """Pre-emptive buy when price has risen for several hours under shop stack."""
+    need = int(PARAMS["frontrun_uptrend_hours"])
+    return _UPTREND_HOURS.get(crop, 0) >= need
+
+
+def harvest_ev_score(s: dict[str, Any], crop: str) -> float:
+    """Harvest priority EV with spike boost independent of inventory plan."""
+    ev = plan_ev(s, crop)
+    if price_spike(s, crop):
+        return ev * float(PARAMS["spike_harvest_mult"])
+    spikes = (s.get("regime") or {}).get("price_spike") or {}
+    if spikes.get(crop):
+        return ev * float(PARAMS["spike_harvest_mult"])
+    return ev
 
 
 def milk_sink(s: dict[str, Any]) -> int:
@@ -211,6 +308,85 @@ def berry_sink(s: dict[str, Any]) -> int:
 
 
 _LAND_SPRINT: dict[str, int] = {"until_day": -1}
+_LATE_SHOP_SPRINT: dict[str, int] = {"until_day": -1}
+_SHOP_TRACK: dict[str, Any] = {"prev_shops": set()}
+_UPTREND_HOURS: dict[str, int] = {}
+
+
+def update_shop_tracking(s: dict[str, Any]) -> None:
+    """Track shop unlocks; trigger a berry sprint when a berry shop opens late."""
+    global _SHOP_TRACK, _LATE_SHOP_SPRINT
+    shops = set(s.get("shops") or [])
+    prev = set(_SHOP_TRACK.get("prev_shops") or set())
+    new_berry = [sh for sh in shops if sh in BERRY_SHOPS and sh not in prev]
+    if new_berry and s["day"] >= int(PARAMS["late_shop_day_min"]):
+        until = s["day"] + int(PARAMS["late_shop_sprint_days"])
+        _LATE_SHOP_SPRINT["until_day"] = max(
+            _LATE_SHOP_SPRINT.get("until_day", -1), until
+        )
+    _SHOP_TRACK["prev_shops"] = shops
+
+
+def late_shop_sprint(s: dict[str, Any]) -> bool:
+    """Aggressive berry/land fill for a few days after a late berry-shop unlock."""
+    if s["day"] > int(PARAMS["late_shop_sprint_cutoff_day"]):
+        return False
+    return _LATE_SHOP_SPRINT.get("until_day", -1) >= s["day"]
+
+
+def _cash_deficit(s: dict[str, Any]) -> float:
+    plan = crop_plan(s)
+    planned_seed_spend = 0
+    for c in CASH_PLANT:
+        target = plan.get(c, 0)
+        have = s["crops"].get(c, 0) + s["seeds"].get(c, 0)
+        need = max(0, target - have)
+        planned_seed_spend += need * SEED_COST[c]
+    return max(0.0, planned_seed_spend - float(s.get("money", 0)))
+
+
+def detect_regime(s: dict[str, Any]) -> dict[str, Any]:
+    """Classify the current turn for phase-aware overrides."""
+    left = days_left(s["day"])
+    demand = s.get("demand") or {}
+    demand_stack = any(
+        int(demand.get(c, 0)) >= 2 for c in ("TOMATO", "STRAWBERRY", "MILK", "EGG", "CARROT")
+    )
+    spikes = {item: price_spike(s, item) for item in BASE_PRICE}
+    price_spike_any = any(spikes.values())
+    late_ongoing = left < 8 and any(
+        px(s, c) >= int(BASE_PRICE[c]) * float(PARAMS["ongoing_spike_price_factor"])
+        for c in ONGOING
+    )
+    late_shop = late_shop_sprint(s)
+    cash_deficit = _cash_deficit(s)
+    liquidity_stress = cash_deficit >= 900
+    endgame = left <= int(PARAMS["endgame_days_left"]) or s["day"] >= int(
+        PARAMS["liquidate_day_min"]
+    )
+
+    phase = "ENGINE"
+    if s["day"] >= int(PARAMS["liquidate_day_min"]):
+        phase = "LIQUIDATE"
+    elif left <= int(PARAMS["endgame_days_left"]):
+        phase = "ENDGAME"
+    elif late_shop:
+        phase = "LATE_RAMP"
+    elif price_spike_any or demand_stack:
+        phase = "SPIKE"
+
+    regime = {
+        "phase": phase,
+        "demand_stack": demand_stack,
+        "price_spike": spikes,
+        "late_ongoing": late_ongoing,
+        "late_shop_sprint": late_shop,
+        "liquidity_stress": liquidity_stress,
+        "endgame": endgame,
+        "cash_deficit": cash_deficit,
+    }
+    s["regime"] = regime
+    return regime
 
 
 def berry_gap(s: dict[str, Any]) -> int:
@@ -225,7 +401,7 @@ def berry_gap(s: dict[str, Any]) -> int:
 
 def plant_sprint(s: dict[str, Any]) -> bool:
     """Fill empty tiles aggressively for two days after buying land."""
-    if s["day"] > 22:
+    if s["day"] > int(PARAMS["seed_fill_day_max"]):
         return False
     return _LAND_SPRINT.get("until_day", -1) >= s["day"]
 
@@ -236,16 +412,17 @@ def berry_replant_push(s: dict[str, Any]) -> bool:
 
 def seed_fill_push(s: dict[str, Any]) -> bool:
     """Buy/plant aggressively after land buys or when many tiles sit empty."""
-    if s["day"] > 22:
+    if s["day"] > int(PARAMS["seed_fill_day_max"]):
         return False
-    # Slightly lower threshold to reduce idle tiles earlier.
     return plant_sprint(s) or s["empty"] >= 8
 
 
 def berry_ramp(s: dict[str, Any]) -> bool:
-    """Berry shop open midgame with room to plant — ramp through day 16."""
-    # Start the ramp slightly earlier so strawberries can mature by day 16.
-    if not berry_ok(s) or s["day"] < 7 or s["day"] > 16:
+    """Berry shop open midgame with room to plant — ramp through day 16 (or late sprint)."""
+    late = late_shop_sprint(s)
+    day_max = 18 if late else 16
+    gap_need = 2 if late else 3
+    if not berry_ok(s) or s["day"] < 7 or s["day"] > day_max:
         return False
     if s["empty"] < 2:
         return False
@@ -255,9 +432,9 @@ def berry_ramp(s: dict[str, Any]) -> bool:
     have = s["crops"].get("STRAWBERRY", 0) + s["seeds"].get("STRAWBERRY", 0)
     if have >= target:
         return False
-    if s["n_quads"] == 1 and have >= 8:
+    if s["n_quads"] == 1 and have >= 8 and not late:
         return False
-    return berry_gap(s) >= 3
+    return berry_gap(s) >= gap_need
 
 
 def berry_seed_push(s: dict[str, Any]) -> bool:
@@ -281,7 +458,7 @@ def _will_buy_land(s: dict[str, Any], afford: int) -> bool:
     if s["n_quads"] >= 2 and afford - cost < 1500:
         return False
     if not cash_shop(s):
-        best_ev = max(s["scores"].values()) if s["scores"] else 0.0
+        best_ev = max((plan_ev(s, c) for c in s["scores"]), default=0.0)
         if best_ev * 25 * max(3, days_left(s["day"]) // 2) < cost:
             return False
     return True
@@ -315,14 +492,70 @@ def egg_sink(s: dict[str, Any]) -> int:
     return sum(1 for shop in s.get("shops") or [] if shop in ("BAKERY", "BRUNCH_SPOT"))
 
 
+def demand_boost(demand: dict[str, int] | None, crop: str) -> float:
+    """Shop demand multiplier — duplicate shops stack in `shop_demand()`."""
+    d = int((demand or {}).get(crop, 0))
+    linear = float(PARAMS["demand_boost_linear"])
+    stack = float(PARAMS["demand_boost_stack"])
+    return 1.0 + linear * d + stack * max(0, d - 2)
+
+
+def demand_scaled_cap(base: int, demand_count: int, *, step: int) -> int:
+    """Raise soft tile caps when multiple shops want the same product."""
+    d = max(0, int(demand_count))
+    if d <= 1:
+        return base
+    return base + step * (d - 1)
+
+
+def ongoing_crop_score(crop: str, price: int, left: int, boost: float) -> float:
+    """EV for mature ongoing crops after the standard plant window closes."""
+    if crop not in ONGOING:
+        return 0.0
+    if left < int(PARAMS["ongoing_min_days_left"]):
+        return 0.0
+    base = int(BASE_PRICE.get(crop, price))
+    if base <= 0 or price < base * float(PARAMS["ongoing_spike_price_factor"]):
+        return 0.0
+    cost = float(SEED_COST[crop])
+    harvests = max(1, left // 2)
+    return boost * (harvests * price - cost) / max(1.0, float(left))
+
+
+def price_spike(s: dict[str, Any], item: str) -> bool:
+    """True when the market price signals a demand-spike regime."""
+    price = px(s, item)
+    base = int(BASE_PRICE.get(item, 0))
+    if base > 0 and price >= base * float(PARAMS["spike_sell_base_mult"]):
+        return True
+    # MA spike: only in the late window where hold logic would block sells.
+    if days_left(s["day"]) > int(PARAMS["sell_hold_days_left_min"]) + 2:
+        return False
+    hist = float((s.get("price_ma") or {}).get(item, 0) or 0)
+    delta = int((s.get("delta") or {}).get(item, 0) or 0)
+    if hist > 0 and delta > 0 and price >= hist * float(PARAMS["spike_sell_ma_mult"]):
+        return True
+    return False
+
+
+def _median_plan_ev(s: dict[str, Any], crops: list[str]) -> float:
+    vals = sorted(plan_ev(s, c) for c in crops if plan_ev(s, c) > 0)
+    if not vals:
+        return 0.0
+    mid = len(vals) // 2
+    if len(vals) % 2:
+        return float(vals[mid])
+    return (vals[mid - 1] + vals[mid]) / 2.0
+
+
 def crop_score(
     crop: str, price: int, day: int, demand: dict[str, int] | None = None
 ) -> float:
-    """Expected coins per tile-day at the live price. Shops only boost slightly."""
+    """Expected coins per tile-day at the live price. Shops boost via demand."""
     left = days_left(day)
     demand = demand or {}
     price = max(1, price)
-    boost = 1.0 + 0.05 * demand.get(crop, 0)
+    boost = demand_boost(demand, crop)
     if crop == "WHEAT":
         if left < 3:
             return 0.0
@@ -337,12 +570,12 @@ def crop_score(
         return boost * (6 * price - 80) / 10.0
     if crop == "TOMATO":
         if left < 8:
-            return 0.0
+            return ongoing_crop_score("TOMATO", price, left, boost)
         n = min(4, left - 7)
         return boost * (n * price - 50) / min(12.0, left)
     if crop == "STRAWBERRY":
         if left < 8:
-            return 0.0
+            return ongoing_crop_score("STRAWBERRY", price, left, boost)
         n = min(5, 1 + max(0, left - 8) // 2)
         return boost * (n * price - 100) / min(17.0, left)
     return 0.0
@@ -388,14 +621,18 @@ def tile_budget(s: dict[str, Any]) -> tuple[int, int, int]:
 
 
 def berry_tile_cap(s: dict[str, Any]) -> int:
-    """Strawberries scale with land. A hard 16 left extra quadrants empty."""
+    """Strawberries scale with land and stacked berry-shop demand."""
     if s["n_quads"] <= 1:
-        return 8
-    if s["n_quads"] == 2:
-        return 28
-    if s["n_quads"] == 3:
-        return 48
-    return 60
+        base = 8
+    elif s["n_quads"] == 2:
+        base = 28
+    elif s["n_quads"] == 3:
+        base = 48
+    else:
+        base = 60
+    berry_d = int((s.get("demand") or {}).get("STRAWBERRY", 0))
+    step = int(PARAMS["demand_cap_step_berry"])
+    return demand_scaled_cap(base, berry_d, step=step)
 
 
 def crop_plan(s: dict[str, Any]) -> dict[str, int]:
@@ -408,6 +645,7 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
     plan = {c: 0 for c in SEED_COST}
     plan["WHEAT"] = wheat_tiles
     leftover = room
+    cap_bonus = min(int(PARAMS["cap_override_bonus_max"]), room)
     demand = s.get("demand") or {}
     # Early-game melon is a small EV cash-cycle starter while there is
     # no STRAWBERRY demand yet. (Using `demand` avoids mismatches where
@@ -424,45 +662,57 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
         leftover -= n
 
     candidates: list[str] = []
-    if demand.get("STRAWBERRY", 0) >= 1 and crop_score("STRAWBERRY", px(s, "STRAWBERRY"), s["day"], demand) > 0:
+    if demand.get("STRAWBERRY", 0) >= 1 and plan_viable(s, "STRAWBERRY"):
         candidates.append("STRAWBERRY")
-    if demand.get("CARROT", 0) >= 1 and crop_score("CARROT", px(s, "CARROT"), s["day"], demand) > 0:
+    if demand.get("CARROT", 0) >= 1 and plan_viable(s, "CARROT"):
         candidates.append("CARROT")
-    if demand.get("TOMATO", 0) >= 1 and crop_score("TOMATO", px(s, "TOMATO"), s["day"], demand) > 0:
+    if demand.get("TOMATO", 0) >= 1 and plan_viable(s, "TOMATO"):
         candidates.append("TOMATO")
     if (
         leftover >= PARAMS["melon_leftover_min"]
         and (s["n_quads"] >= PARAMS["melon_n_quads_min"] or melon_early)
         and s["day"] <= PARAMS["melon_day_max"]
-        and live_ev(s, "MELON") > live_ev(s, "WHEAT")
+        and plan_viable(s, "MELON")
+        and plan_ev(s, "MELON") > plan_ev(s, "WHEAT")
     ):
         candidates.append("MELON")
 
     # EV-driven allocator: increment one cash tile at a time, choosing the
     # crop with best EV per seed-cost. This replaces fixed per-crop caps.
     def tile_marginal_score(crop: str) -> float:
-        price = px(s, crop)
-        ev = float(s["scores"].get(crop, 0.0) or 0.0)
+        ev = plan_ev(s, crop)
         cost = float(SEED_COST.get(crop, 1))
-        # Mild momentum tilt so the allocator prefers uptrends.
-        delta = (s.get("delta") or {}).get(crop, 0)
-        momentum = 1.0 + max(-0.2, min(0.2, float(delta) / 200.0))
-        return ev
+        return ev / max(1.0, cost)
 
     # Keep allocation stable by using the candidate set as the search space.
     # (We already gated candidates with crop_score > 0.)
+    cap_step = int(PARAMS["demand_cap_step_crop"])
     cap_map: dict[str, int] = {}
     for c in candidates:
         if c == "STRAWBERRY":
             cap_map[c] = berry_tile_cap(s)
         elif c == "CARROT":
-            cap_map[c] = 4 if s["n_quads"] == 1 else 8
+            base = 4 if s["n_quads"] == 1 else 8
+            cap_map[c] = demand_scaled_cap(base, demand.get("CARROT", 0), step=cap_step)
         elif c == "TOMATO":
-            cap_map[c] = 4 if s["n_quads"] == 1 else 8
+            base = 4 if s["n_quads"] == 1 else 8
+            cap_map[c] = demand_scaled_cap(base, demand.get("TOMATO", 0), step=cap_step)
         elif c == "MELON":
             cap_map[c] = min(3 if melon_early else 8, leftover)
         else:
             cap_map[c] = 0
+
+    med_ev = _median_plan_ev(s, candidates)
+    override_mult = float(PARAMS["cap_override_ev_mult"])
+    price_factor = float(PARAMS["cap_override_price_factor"])
+    if med_ev > 0 and cap_bonus > 0:
+        for c in candidates:
+            base_px = int(BASE_PRICE.get(c, 0))
+            px_now = px(s, c)
+            if base_px <= 0 or px_now < base_px * price_factor:
+                continue
+            if plan_ev(s, c) > override_mult * med_ev:
+                cap_map[c] = cap_map.get(c, 0) + cap_bonus
 
     while leftover > 0:
         remaining = [c for c in candidates if plan[c] < cap_map.get(c, 0)]
@@ -514,7 +764,14 @@ def want_cows(s: dict[str, Any]) -> int:
         return s["cows"]
     if not herd_can_expand(s):
         return s["cows"]
-    return min(s["cows"] + 1, PARAMS["cow_expand_cap"])
+    sink = milk_sink(s)
+    milk_target = min(
+        int(PARAMS["cow_expand_cap"]),
+        max(int(floor), int(PARAMS["milk_herd_base"]) + sink),
+    )
+    if s["cows"] < milk_target:
+        return min(s["cows"] + 1, milk_target)
+    return min(s["cows"] + 1, int(PARAMS["cow_expand_cap"]))
 
 
 def want_sheep(s: dict[str, Any]) -> int:
@@ -523,13 +780,20 @@ def want_sheep(s: dict[str, Any]) -> int:
     floor = PARAMS["sheep_floor"] if s["day"] <= PARAMS["sheep_floor_day_max"] else 0
     if s["sheep"] < floor:
         return floor
-    if s["demand"].get("WOOL", 0) <= 0:
+    wool_d = int(s["demand"].get("WOOL", 0))
+    if wool_d <= 0:
         return s["sheep"]
     if s["n_quads"] == 1:
         return s["sheep"]
     if not herd_can_expand(s):
         return s["sheep"]
-    return min(s["sheep"] + 1, PARAMS["sheep_expand_cap"])
+    wool_target = min(
+        int(PARAMS["sheep_expand_cap"]),
+        max(int(floor), int(PARAMS["wool_herd_base"]) + wool_d),
+    )
+    if s["sheep"] < wool_target:
+        return min(s["sheep"] + 1, wool_target)
+    return min(s["sheep"] + 1, int(PARAMS["sheep_expand_cap"]))
 
 
 def want_geese(s: dict[str, Any]) -> int:
@@ -537,8 +801,9 @@ def want_geese(s: dict[str, Any]) -> int:
         return s["geese"]
     egg_px = px(s, "EGG")
     goose_ev = animal_score("GOOSE", egg_px, s["day"])
+    sinks = egg_sink(s)
     # Saturated egg-shop maps (2× bakery + brunch) need cash for berries, not geese.
-    if egg_sink(s) >= 3 and egg_px < 80:
+    if sinks >= 3 and egg_px < 80:
         return s["geese"]
     if egg_px < 55 or goose_ev <= 12:
         return s["geese"]
@@ -551,6 +816,12 @@ def want_geese(s: dict[str, Any]) -> int:
         return s["geese"]
     if not herd_can_expand(s):
         return s["geese"]
+    # Scale goose target with egg-shop count when eggs are priced well.
+    egg_target = max_geese
+    if sinks >= 2 and egg_px >= 65:
+        egg_target = min(max_geese, 1 + (sinks - 1) // 2)
+    if s["geese"] < egg_target:
+        return min(s["geese"] + 1, egg_target)
     return min(s["geese"] + 1, max_geese)
 
 
@@ -737,7 +1008,7 @@ def read_signals(obs: dict[str, Any]) -> dict[str, Any]:
 
 
 def pick_mode(s: dict[str, Any]) -> str:
-    if s["day"] >= 28:
+    if s["day"] >= int(PARAMS["liquidate_day_min"]):
         return "LIQUIDATE"
     return "ENGINE"
 
@@ -778,7 +1049,7 @@ def pick_crop(s: dict[str, Any], seeds: dict[str, int]) -> str | None:
         if seeds.get(crop, 0) > 0 and s["crops"][crop] < plan.get(crop, 0)
     ]
     if cash:
-        return max(cash, key=lambda c: s["scores"].get(c, 0.0))
+        return max(cash, key=lambda c: plan_ev(s, c))
     if (
         berry_ok(s)
         and s["day"] <= 26
@@ -970,6 +1241,11 @@ def action_for(tiles, x, y, day, seeds, claimed, s, inv, ctx):
     if isinstance(tile, dict) and tile.get("kind") == "PLANT":
         if crop_ready(tile, day, ctx.get("early_wheat", False)):
             crop = tile.get("crop")
+            # Track all harvested crops for in-turn shed projection
+            # (WHEAT, MILK/WOOl cashflow, etc).
+            if crop:
+                shed_delta = ctx.setdefault("shed_delta", {})
+                shed_delta[crop] = shed_delta.get(crop, 0) + 1
             # Position throttling is for "clearing" crops. For ONGOING crops
             # (e.g. TOMATO/STRAWBERRY), the tile remains and we don't want to
             # artificially suppress repeated harvests within the sell window.
@@ -1228,6 +1504,7 @@ def _buy_planned_seeds(
     berry_only: bool = False,
 ) -> int:
     plan = crop_plan(s)
+    rescue = bool(s.get("liquidity_rescue", False))
     cash_planned = any(plan.get(c, 0) > 0 for c in CASH_PLANT)
     cap_n = 8 if cash_planned else 4
     if s["n_quads"] >= 2 and afford >= 1600:
@@ -1240,6 +1517,14 @@ def _buy_planned_seeds(
         cap_n = max(cap_n, 8)
     if seed_fill_push(s):
         cap_n = max(cap_n, min(16, s["empty"]))
+    if late_shop_sprint(s):
+        cap_n = max(cap_n, 12)
+    for c in CASH_PLANT:
+        if uptrend_frontrun(s, c) and plan.get(c, 0) > 0:
+            cap_n = max(cap_n, int(PARAMS["frontrun_cap_bonus"]))
+            break
+    if rescue:
+        cap_n = max(cap_n, 12)
     order = [c for c in CASH_PLANT if plan.get(c, 0) > 0]
 
     # "Stock market" style ranking: prefer crops where we still need tiles,
@@ -1249,12 +1534,16 @@ def _buy_planned_seeds(
         need_tiles = plan[c] - have
         if need_tiles <= 0:
             return -1e9
-        ev = float(s["scores"].get(c, 0.0))
-        delta = (s.get("delta") or {}).get(c, 0)
-        # Symmetric momentum: reward uptrend, penalize downtrend.
-        momentum = 1.0 + max(-0.2, min(0.2, float(delta) / 200.0))
+        ev = plan_ev(s, c)
         cost = float(SEED_COST.get(c, 1))
-        return (need_tiles * ev * max(0.6, momentum)) / max(1.0, cost)
+        score = (need_tiles * ev) / max(1.0, cost)
+        if uptrend_frontrun(s, c):
+            score *= float(PARAMS["frontrun_score_mult"])
+        if rescue:
+            # Liquidity rescue: favor faster payback crops to recover cashflow.
+            payback_days = {"STRAWBERRY": 5.0, "CARROT": 3.0, "TOMATO": 4.0, "MELON": 10.0}.get(c, 6.0)
+            score *= (6.0 / payback_days)
+        return score
 
     order.sort(key=marginal_score, reverse=True)
     fill_push = seed_fill_push(s)
@@ -1279,6 +1568,8 @@ def _buy_planned_seeds(
                 keep = 80
             elif berry_ramp(s):
                 keep = 200
+            elif late_shop_sprint(s):
+                keep = 120
             else:
                 keep = 400 if s["n_quads"] >= 2 else 800
             if plant_sprint(s):
@@ -1290,6 +1581,8 @@ def _buy_planned_seeds(
         else:
             keep = 200 if plant_sprint(s) else 800
 
+        if rescue:
+            keep = int(keep * 0.6)
         # Safety clamp: never reserve more cash than we currently have.
         keep = max(0, min(afford - 1, keep))
 
@@ -1406,6 +1699,8 @@ def _keep_fert(s: dict[str, Any]) -> int:
 
 def _sell_score(s: dict[str, Any], item: str, n: int) -> int:
     price = px(s, item)
+    if price_spike(s, item):
+        return n * price
     # Winners liquidate strawberries aggressively once the berry-shop mix is
     # strong (multiple berry sinks open). Don't let the generic hold heuristic
     # block cash-out in that midgame window.
@@ -1415,7 +1710,7 @@ def _sell_score(s: dict[str, Any], item: str, n: int) -> int:
         item in ("STRAWBERRY", "MELON", "MILK", "WOOL")
         and days_left(s["day"]) >= PARAMS["sell_hold_days_left_min"]
     ):
-        hist = float(s.get("mean3", {}).get(item, price) or price)
+        hist = float(s.get("price_ma", {}).get(item, price) or price)
         if hist > 0 and price < hist * PARAMS["sell_hold_price_factor"]:
             # If the market is moving up (positive delta), sell instead of
             # holding through a likely bounce.
@@ -1449,11 +1744,11 @@ def _sell_goods(
     for c in CASH_CROPS:
         base = max(2, min(10, int(plan.get(c, 0)) // 3))
         keep = int(round(base * sell_scale))
-        # Make the keep-floor adaptive, but only when `mean3` exists.
-        # (If mean3 is missing we avoid guessing and keep the original floor.)
+        # Make the keep-floor adaptive, but only when `price_ma` exists.
+        # (If price_ma is missing we avoid guessing and keep the original floor.)
         price = float(px(s, c))
-        mean3 = s.get("mean3") or {}
-        hist = float(mean3.get(c, 0) or 0)
+        price_ma = s.get("price_ma") or {}
+        hist = float(price_ma.get(c, 0) or 0)
         if hist > 0:
             threshold = hist * float(PARAMS["sell_hold_price_factor"])
             ratio = (price / threshold) if threshold > 0 else 1.0
@@ -1482,8 +1777,7 @@ def _sell_goods(
                 # Stock-like tilt: if price is trending up, slightly
                 # prioritize liquidation earlier. Bound adjustment to
                 # prevent overreacting to noisy deltas.
-                delta = (s.get("delta") or {}).get(item, 0)
-                momentum = 1.0 + max(-0.2, min(0.2, float(delta) / 200.0))
+                momentum = price_momentum(s, item)
                 ranked.append((int(score * momentum), item, n))
     ranked.sort(reverse=True)
     for _, item, n in ranked[:max_actions]:
@@ -1529,6 +1823,15 @@ def _start_market(s: dict[str, Any], mode: str) -> tuple[list, int, dict[str, An
     cash_deficit = max(0, planned_seed_spend - float(s2.get("money", 0)))
     if mode != "LIQUIDATE" and cash_deficit >= 1200:
         sell_n = max(sell_n, 4)
+    rescue = (
+        mode != "LIQUIDATE"
+        and s2.get("day", 0) <= int(PARAMS["liquidity_rescue_day_max"])
+        and s2.get("empty", 0) >= 8
+        and cash_deficit >= 900
+    )
+    if rescue:
+        sell_n = max(sell_n, 5)
+    s2["liquidity_rescue"] = rescue
 
     proceeds = _sell_goods(market, s2, shed, max_actions=sell_n)
     wheat = shed.get("WHEAT", 0)
@@ -1668,8 +1971,12 @@ def market_for(s: dict[str, Any], mode: str) -> list:
 def agent(obs: dict[str, Any]) -> dict[str, Any]:
     s = read_signals(obs)
     update_price_book(s)
+    update_shop_tracking(s)
+    update_uptrend_tracking(s)
+    refresh_planning_scores(s)
+    detect_regime(s)
     mode = pick_mode(s)
-    market = market_for(s, mode)
+    market = []
     seeds = dict(s["seeds"])
     claimed = set()
     n_feeders = min(s["workers"], s["hungry"]) if s["hungry"] else 0
@@ -1692,12 +1999,16 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
         need = max(0, target - have)
         planned_seed_spend += need * SEED_COST[c]
     cash_deficit = max(0, planned_seed_spend - float(s.get("money", 0)))
+    regime = s.get("regime") or {}
     if mode != "LIQUIDATE" and cash_deficit >= 1200:
         sell_n_est = max(sell_n_est, 4)
+    if regime.get("phase") == "ENDGAME":
+        sell_n_est = max(sell_n_est, 5)
 
     inventory_target: dict[str, float] = {}
     inventory_stock: dict[str, float] = {}
-    for c in CASH_CROPS:
+    harvest_crops = ("STRAWBERRY", "CARROT", "TOMATO")
+    for c in harvest_crops:
         base = max(2.0, min(10.0, float(plan.get(c, 0)) / 3.0))
         scaled = base * (sell_n_est / 3.0)
         inv_target = max(1.0, min(12.0, scaled))
@@ -1729,9 +2040,14 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
         "use_fert": _keep_fert(s) > 0,
         "skip_care": milk_px(s) < 40,
         # Harvest priority signals (explicitly decoupled from sell-now rules).
-        "crop_ev_score": {c: s["scores"].get(c, 0.0) for c in CASH_CROPS},
+        "crop_ev_score": {c: harvest_ev_score(s, c) for c in CASH_PLANT},
         "inventory_target": inventory_target,
         "inventory_stock": inventory_stock,
+        # Project harvested outputs for in-turn market planning. We already
+        # model cash-crop inventory via `inventory_stock`; this tracks
+        # everything else (e.g. WHEAT) without interfering with harvest
+        # urgency.
+        "shed_delta": {},
     }
     me = obs["farms"][obs["player"]]
     private = obs["private"]
@@ -1761,4 +2077,16 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
             ctx,
         )
         hands.append(action)
+    # Harvest-to-market projection: farmer actions are chosen before the
+    # environment applies harvest outputs. Project harvested cash crops into
+    # `shed` so `_sell_goods()` / `_start_market()` sees the correct inventory.
+    inv_stock = ctx.get("inventory_stock") or {}
+    for c, v in inv_stock.items():
+        s["shed"][c] = int(v)
+    shed_delta = ctx.get("shed_delta") or {}
+    for c, d in shed_delta.items():
+        # Cash crops are already projected via `inventory_stock`.
+        if c not in inv_stock:
+            s["shed"][c] = s["shed"].get(c, 0) + int(d)
+    market = market_for(s, mode)
     return {"farmer": farmer, "hands": hands, "market": market}

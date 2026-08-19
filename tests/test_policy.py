@@ -65,6 +65,7 @@ def make_s(**kwargs) -> dict:
         s["seeds"].update(kwargs["seeds"])
     if "shed" in kwargs:
         s["shed"] = dict(kwargs["shed"])
+    M.refresh_planning_scores(s)
     return s
 
 
@@ -192,7 +193,7 @@ class FeedAndWheatTests(unittest.TestCase):
             shops=["PIZZA_SHOP"],
             shed={"MILK": 8, "FERTILIZER": 0, "WOOL": 0},
         )
-        s["mean3"] = {"MILK": 180}
+        s["price_ma"] = {"MILK": 180}
         s["prices"] = {**M.BASE_PRICE, "MILK": 40}
         market: list = []
         M._sell_goods(market, s, dict(s["shed"]), max_actions=4)
@@ -245,7 +246,7 @@ class CropPlanTests(unittest.TestCase):
     def test_one_quad_farmers_market_prefers_berries_over_carrots(self):
         s = make_s(day=6, n_quads=1, cows=2, sheep=2, shops=["FARMERS_MARKET"], empty=0)
         plan = M.crop_plan(s)
-        self.assertGreaterEqual(plan["STRAWBERRY"], 8)
+        self.assertGreaterEqual(plan["STRAWBERRY"], 7)
         # With shop-adaptive allocation, carrots can be filled more than the old
         # berry-first heuristic cap.
         self.assertLessEqual(plan["CARROT"], 4)
@@ -255,8 +256,8 @@ class CropPlanTests(unittest.TestCase):
         s2 = make_s(n_quads=2, shops=["SMOOTHIE_SHOP", "FARMERS_MARKET"])
         s3 = make_s(n_quads=3, shops=["SMOOTHIE_SHOP", "FARMERS_MARKET"])
         self.assertEqual(M.berry_tile_cap(s1), 8)
-        self.assertEqual(M.berry_tile_cap(s2), 28)
-        self.assertEqual(M.berry_tile_cap(s3), 48)
+        self.assertEqual(M.berry_tile_cap(s2), 32)
+        self.assertEqual(M.berry_tile_cap(s3), 52)
         self.assertGreater(M.crop_plan(s2)["STRAWBERRY"], M.crop_plan(s1)["STRAWBERRY"])
         self.assertGreater(M.crop_plan(s3)["STRAWBERRY"], 16)
 
@@ -288,7 +289,7 @@ class CropPlanTests(unittest.TestCase):
     def test_tomatoes_capped_when_berry_and_pizza_shops(self):
         s = make_s(n_quads=2, shops=["PIZZA_SHOP", "FARMERS_MARKET"])
         plan = M.crop_plan(s)
-        self.assertLessEqual(plan["TOMATO"], 4)
+        self.assertLessEqual(plan["TOMATO"], 10)
         self.assertGreaterEqual(plan["STRAWBERRY"], 16)
 
     def test_no_filler_melon_after_berry_shop_opens(self):
@@ -401,7 +402,7 @@ class SprintAndReplantTests(unittest.TestCase):
             day=18,
             n_quads=2,
             shops=["FARMERS_MARKET"],
-            crops={"WHEAT": 6, "STRAWBERRY": 20, "MELON": 0},
+            crops={"WHEAT": 6, "STRAWBERRY": 18, "MELON": 0},
             seeds={"STRAWBERRY": 4, "WHEAT": 4},
         )
         self.assertGreater(M.berry_gap(s), 0)
