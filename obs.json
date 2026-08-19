@@ -1,0 +1,475 @@
+{
+    "remainingOverageTime": 60,
+    "step": 718,
+    "player": 0,
+    "farms": [
+        {
+            "money": 6395.0,
+            "tiles": [
+                [
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 29,
+                        "watered_today": true,
+                        "consecutive_unwatered": 1,
+                        "yield_units": 1,
+                        "max_lifespan_step": 816,
+                        "fertilized_until_day": -1
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    null,
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 29,
+                        "watered_today": true,
+                        "consecutive_unwatered": 1,
+                        "yield_units": 1,
+                        "max_lifespan_step": 816,
+                        "fertilized_until_day": -1
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 27,
+                        "watered_today": false,
+                        "consecutive_unwatered": 1,
+                        "yield_units": 1,
+                        "max_lifespan_step": 768,
+                        "fertilized_until_day": -1
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 26,
+                        "watered_today": true,
+                        "consecutive_unwatered": 0,
+                        "yield_units": 3,
+                        "max_lifespan_step": 744,
+                        "fertilized_until_day": -1
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    null,
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 29,
+                        "watered_today": true,
+                        "consecutive_unwatered": 1,
+                        "yield_units": 1,
+                        "max_lifespan_step": 816,
+                        "fertilized_until_day": -1
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    null,
+                    null,
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 28,
+                        "watered_today": true,
+                        "consecutive_unwatered": 0,
+                        "yield_units": 1,
+                        "max_lifespan_step": 792,
+                        "fertilized_until_day": -1
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 28,
+                        "watered_today": true,
+                        "consecutive_unwatered": 0,
+                        "yield_units": 1,
+                        "max_lifespan_step": 792,
+                        "fertilized_until_day": -1
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 28,
+                        "watered_today": true,
+                        "consecutive_unwatered": 0,
+                        "yield_units": 1,
+                        "max_lifespan_step": 792,
+                        "fertilized_until_day": -1
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "WHEAT",
+                        "planted_day": 28,
+                        "watered_today": true,
+                        "consecutive_unwatered": 0,
+                        "yield_units": 1,
+                        "max_lifespan_step": 792,
+                        "fertilized_until_day": -1
+                    },
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ]
+            ],
+            "farmer": [
+                2,
+                0
+            ],
+            "hands": [
+                [
+                    2,
+                    0
+                ]
+            ],
+            "unlocked_quadrants": [
+                "NW"
+            ],
+            "hires_today": 1
+        },
+        {
+            "money": 4273.0,
+            "tiles": [
+                [
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    {
+                        "kind": "WEED"
+                    },
+                    null,
+                    null,
+                    null,
+                    null,
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    null,
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "WEED"
+                    },
+                    null,
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    null,
+                    null,
+                    {
+                        "kind": "WEED"
+                    },
+                    null,
+                    null,
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    {
+                        "kind": "WEED"
+                    },
+                    null,
+                    null,
+                    {
+                        "kind": "WEED"
+                    },
+                    {
+                        "kind": "PLANT",
+                        "crop": "CARROT",
+                        "planted_day": 27,
+                        "watered_today": true,
+                        "consecutive_unwatered": 0,
+                        "yield_units": 2,
+                        "max_lifespan_step": 744,
+                        "fertilized_until_day": -1
+                    },
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ],
+                [
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED",
+                    "LOCKED"
+                ]
+            ],
+            "farmer": [
+                4,
+                4
+            ],
+            "hands": [],
+            "unlocked_quadrants": [
+                "NW"
+            ],
+            "hires_today": 0
+        }
+    ],
+    "private": {
+        "shed": {
+            "WHEAT": 0,
+            "CARROT": 0,
+            "TOMATO": 0,
+            "STRAWBERRY": 0,
+            "MELON": 0,
+            "EGG": 0,
+            "MILK": 0,
+            "WOOL": 0,
+            "FERTILIZER": 0,
+            "GOOSE": 0,
+            "COW": 0,
+            "SHEEP": 0
+        },
+        "seeds": {
+            "WHEAT": 5,
+            "CARROT": 0,
+            "TOMATO": 0,
+            "STRAWBERRY": 0,
+            "MELON": 0
+        },
+        "inventories": [
+            {
+                "WHEAT": 9
+            },
+            {}
+        ]
+    },
+    "market": {
+        "inventory": {
+            "WHEAT": 9910,
+            "CARROT": 9070,
+            "TOMATO": 9844,
+            "STRAWBERRY": 9682,
+            "MELON": 9970,
+            "EGG": 9862,
+            "MILK": 9808,
+            "WOOL": 9970,
+            "FERTILIZER": 10000
+        },
+        "prices": {
+            "WHEAT": 34,
+            "CARROT": 426,
+            "TOMATO": 79,
+            "STRAWBERRY": 270,
+            "MELON": 280,
+            "EGG": 58,
+            "MILK": 280,
+            "WOOL": 229,
+            "FERTILIZER": 100
+        }
+    },
+    "town": {
+        "unlocked_shops": [
+            "SMOOTHIE_SHOP",
+            "PET_CAFE",
+            "PET_CAFE",
+            "BAKERY",
+            "PET_CAFE",
+            "FARMERS_MARKET",
+            "FARMERS_MARKET",
+            "PET_CAFE"
+        ]
+    },
+    "day": 29,
+    "hour": 22
+}

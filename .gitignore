@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+replays/
+logs/
+*.tar.gz
+replay.json
+.env
+.env.*
+credentials.json
+kaggle.json
