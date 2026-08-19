@@ -14,12 +14,21 @@ from pathlib import Path
 from typing import Any
 
 from brain.plan import TurnFlags, TurnPlan, build_turn_plan, compute_sell_n
+from brain.board import (
+    board_fill_land_empty_cap,
+    board_fill_pressure,
+    land_blocked_by_board_fill,
+    late_berry_target_met,
+)
 from brain.map import (
     MapStrategy,
     classify_archetype,
+    land_ramp_relax_active,
+    maybe_reclassify_archetype,
+    resolve_strategy,
     strategy_allows_berry_prep,
     strategy_land_empty_cap,
-    strategy_spike_sell_bump,
+    strategy_quad1_empty_cap,
 )
 
 HARVEST_AGE = {"WHEAT": 4, "CARROT": 3, "MELON": 10}
@@ -139,6 +148,31 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "map_late_berry_day_min": 12,
     "map_early_spike_day_max": 12,
     "map_early_spike_berry_sink_max": 2,
+    "map_provisional_day_min": 5,
+    "map_land_relax_empty_max": 12,
+    "map_land_sprint_relax_empty_max": 14,
+    "map_land1_empty_max": 11,
+    "map_land1_seed_empty_max": 10,
+    "map_milk_stack_pure_min": 1,
+    "map_milk_stack_dual_min": 1,
+    "map_milk_defer_milk_sink_min": 2,
+    "map_milk_defer_empty_max": 14,
+    "map_milk_sprint_defer_empty_max": 12,
+    # Board-fill invariant (no land while board is sparse)
+    "board_fill_land_empty_max_1q": 10,
+    "board_fill_land_empty_max_2q": 8,
+    "board_fill_land_empty_max_3q": 6,
+    "board_fill_late_berry_cap_2q": 8,
+    "board_fill_milk_stack_cap_2q": 10,
+    "board_fill_early_berry_cap_2q": 10,
+    "board_fill_berry_gap_min": 3,
+    "board_fill_berry_target_min": 8,
+    "board_fill_pressure_empty": 6,
+    "board_fill_no_berry_cap_1q": 12,
+    "board_fill_no_berry_cap_2q": 18,
+    "board_fill_no_berry_cap_3q": 14,
+    "board_fill_berry_met_cap_2q": 12,
+    "board_fill_late_preberry_pressure_empty": 16,
     "cap_override_ev_mult": 2.0,
     "cap_override_bonus_max": 4,
     "cap_override_price_factor": 2.0,
@@ -369,6 +403,14 @@ def update_shop_tracking(s: dict[str, Any]) -> None:
         )
     _SHOP_TRACK["prev_shops"] = shops
     _maybe_lock_archetype(s)
+    maybe_reclassify_archetype(
+        s,
+        _SHOP_TRACK,
+        PARAMS,
+        berry_shops=frozenset(BERRY_SHOPS),
+        milk_shops=frozenset(MILK_SHOPS),
+        new_berry_today=bool(new_berry),
+    )
 
 
 def _maybe_lock_archetype(s: dict[str, Any]) -> None:
@@ -393,7 +435,13 @@ def map_strategy(s: dict[str, Any]) -> MapStrategy:
     tp = s.get("turn_plan")
     if tp is not None and tp.strategy != "UNKNOWN":
         return tp.strategy
-    return _SHOP_TRACK.get("archetype", "UNKNOWN")  # type: ignore[return-value]
+    return resolve_strategy(
+        s,
+        _SHOP_TRACK,
+        PARAMS,
+        berry_shops=frozenset(BERRY_SHOPS),
+        milk_shops=frozenset(MILK_SHOPS),
+    )
 
 
 def late_shop_sprint(s: dict[str, Any]) -> bool:
@@ -416,23 +464,34 @@ def land_ramp_relax(s: dict[str, Any]) -> bool:
     tp = s.get("turn_plan")
     if tp is not None:
         return tp.flags.land_ramp_relax
-    return (
-        late_shop_sprint(s)
-        and berry_gap(s) > 0
-        and int(s["empty"]) <= 12
+    strat = map_strategy(s)
+    berry_gap_n = max(
+        0,
+        crop_plan(s).get("STRAWBERRY", 0)
+        - s["crops"].get("STRAWBERRY", 0)
+        - int(s["seeds"].get("STRAWBERRY", 0)),
+    )
+    return land_ramp_relax_active(
+        strat,
+        s,
+        PARAMS,
+        late_shop_sprint=late_shop_sprint(s),
+        berry_gap=berry_gap_n,
+        n_quads=int(s.get("n_quads", 1)),
     )
 
 
-def _compute_land_ramp_relax(s: dict[str, Any]) -> bool:
+def _compute_land_ramp_relax(
+    s: dict[str, Any], *, strategy: MapStrategy, berry_gap: int, lshop: bool
+) -> bool:
     """Uncached land_ramp_relax for plan_turn flag collection."""
-    strat = map_strategy(s)
-    if strat == "LATE_BERRY":
-        return False
-    empty_cap = 14 if strat == "LAND_SPRINT" else 12
-    return (
-        late_shop_sprint(s)
-        and berry_gap(s) > 0
-        and int(s["empty"]) <= empty_cap
+    return land_ramp_relax_active(
+        strategy,
+        s,
+        PARAMS,
+        late_shop_sprint=lshop,
+        berry_gap=berry_gap,
+        n_quads=int(s.get("n_quads", 1)),
     )
 
 
@@ -531,7 +590,13 @@ def seed_fill_push(s: dict[str, Any]) -> bool:
         return plant_sprint(s) or s["empty"] >= 8
     if s["day"] > int(PARAMS["seed_fill_day_max"]):
         return False
-    return plant_sprint(s) or s["empty"] >= 8
+    if plant_sprint(s) or s["empty"] >= 8:
+        return True
+    strat = map_strategy(s)
+    cap = board_fill_land_empty_cap(
+        int(s.get("n_quads", 1)), PARAMS, strategy=strat
+    )
+    return int(s.get("empty", 0)) > cap
 
 
 def berry_ramp(s: dict[str, Any]) -> bool:
@@ -983,11 +1048,35 @@ def need_land(s: dict[str, Any]) -> bool:
         return False
     if s["n_quads"] == 2 and s["day"] >= PARAMS["land2_day_max"]:
         return False
-    if s["n_quads"] == 1 and s["empty"] > (14 if land_ramp_relax(s) else 10):
+    strat = map_strategy(s)
+    gap = berry_gap(s)
+    bok = berry_ok(s)
+    lshop = late_shop_sprint(s)
+    ramp_active = berry_ramp(s) if not s.get("turn_plan") else False
+    tp = s.get("turn_plan")
+    if tp is not None:
+        ramp_active = tp.flags.berry_ramp
+        lshop = tp.flags.late_shop_sprint
+        bok = tp.flags.berry_ok
+        gap = tp.berry_gap
+    if land_blocked_by_board_fill(
+        s,
+        PARAMS,
+        berry_gap=gap,
+        berry_ok=bok,
+        late_shop_sprint=lshop,
+        berry_ramp=ramp_active,
+        strategy=strat,
+    ):
+        return False
+    relax = land_ramp_relax(s)
+    if s["n_quads"] == 1 and s["empty"] > strategy_quad1_empty_cap(
+        strat, PARAMS, relax=relax
+    ):
         return False
     _, cash_room, _ = tile_budget(s)
     if s["n_quads"] == 1:
-        empty_max = 14 if land_ramp_relax(s) else 11
+        empty_max = strategy_quad1_empty_cap(strat, PARAMS, relax=relax)
         if s["empty"] > empty_max:
             return False
         if s["empty"] <= 8:
@@ -996,8 +1085,8 @@ def need_land(s: dict[str, Any]) -> bool:
             return True
         if cash_room <= 4 and cash_shop(s):
             return True
-        if s["seeds"].get("STRAWBERRY", 0) >= 4 and s["empty"] <= (
-            12 if land_ramp_relax(s) else 10
+        if s["seeds"].get("STRAWBERRY", 0) >= 4 and s["empty"] <= strategy_quad1_empty_cap(
+            strat, PARAMS, relax=relax, seed_buy=True
         ):
             return True
         return False
@@ -1013,6 +1102,11 @@ def need_land(s: dict[str, Any]) -> bool:
             empty_max = strategy_land_empty_cap(
                 strat, PARAMS, n_quads=2, relax=True
             )
+        else:
+            if late_berry_target_met(
+                s, PARAMS, berry_gap=gap, strategy=strat
+            ):
+                empty_max = int(PARAMS["board_fill_berry_met_cap_2q"])
         if s["empty"] > empty_max:
             return False
         skip_berry_min = land_ramp_relax(s) and int(
@@ -1056,7 +1150,18 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
         PARAMS["liquidate_day_min"]
     )
     bok = crops.get("STRAWBERRY", 0) > 0
+    strat = map_strategy(s)
     # Collect flags before turn_plan exists (helpers fall through to live compute).
+    fill_pressure = board_fill_pressure(
+        s,
+        PARAMS,
+        berry_gap=berry_gap_n,
+        berry_ok=bok,
+        late_shop_sprint=lshop,
+        berry_ramp=berry_ramp(s),
+        plant_sprint=plant_sprint(s),
+        strategy=strat,
+    )
     flags = TurnFlags(
         late_shop_sprint=lshop,
         berry_prep=prep,
@@ -1065,7 +1170,10 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
         seed_fill_push=seed_fill_push(s),
         berry_replant_push=berry_replant_push(s),
         in_late_ramp=lshop,
-        land_ramp_relax=_compute_land_ramp_relax(s),
+        land_ramp_relax=_compute_land_ramp_relax(
+            s, strategy=strat, berry_gap=berry_gap_n, lshop=lshop
+        ),
+        board_fill_pressure=fill_pressure,
         need_land=need_land(s),
         berry_ok=bok,
         liquidity_stress=liquidity_stress,
@@ -1082,7 +1190,7 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
         cash_deficit=cash_deficit,
         days_left=left,
         endgame=endgame,
-        strategy=map_strategy(s),
+        strategy=strat,
     )
     s["turn_plan"] = tp
     s["regime"] = tp.regime

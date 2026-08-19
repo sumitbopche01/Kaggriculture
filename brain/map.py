@@ -1,4 +1,4 @@
-"""Map archetype classification — locked once per episode around day 8."""
+"""Map archetype classification — locked per episode around day 8 with provisional + reclassify."""
 
 from __future__ import annotations
 
@@ -7,6 +7,24 @@ from typing import Any, Literal
 MapStrategy = Literal["UNKNOWN", "EARLY_BERRY", "LATE_BERRY", "MILK_STACK", "LAND_SPRINT"]
 
 EGG_SHOPS = frozenset({"BAKERY", "BRUNCH_SPOT"})
+
+
+def _shop_counts(
+    shops: set[str],
+    *,
+    berry_shops: frozenset[str],
+    milk_shops: frozenset[str],
+) -> tuple[int, int, int, int, int]:
+    berry_n = sum(1 for name in shops if name in berry_shops)
+    milk_n = sum(1 for name in shops if name in milk_shops)
+    egg_n = sum(1 for name in shops if name in EGG_SHOPS)
+    pure_milk_n = sum(
+        1 for name in shops if name in milk_shops and name not in berry_shops
+    )
+    dual_milk_berry_n = sum(
+        1 for name in shops if name in milk_shops and name in berry_shops
+    )
+    return berry_n, milk_n, egg_n, pure_milk_n, dual_milk_berry_n
 
 
 def classify_archetype(
@@ -19,12 +37,14 @@ def classify_archetype(
 ) -> MapStrategy:
     """Classify the town from shop unlocks observed by the lock day."""
     shops = set(s.get("shops") or [])
-    berry_n = sum(1 for name in shops if name in berry_shops)
-    milk_n = sum(1 for name in shops if name in milk_shops)
-    egg_n = sum(1 for name in shops if name in EGG_SHOPS)
+    berry_n, _milk_n, egg_n, pure_milk_n, dual_milk_berry_n = _shop_counts(
+        shops, berry_shops=berry_shops, milk_shops=milk_shops
+    )
     first_berry = track.get("first_berry_day")
     early_max = int(params.get("map_early_berry_day_max", 8))
     late_min = int(params.get("map_late_berry_day_min", 12))
+    milk_pure_min = int(params.get("map_milk_stack_pure_min", 1))
+    milk_dual_min = int(params.get("map_milk_stack_dual_min", 1))
 
     if first_berry is not None and first_berry <= early_max:
         return "EARLY_BERRY"
@@ -32,15 +52,105 @@ def classify_archetype(
         return "LATE_BERRY"
     if first_berry is not None and first_berry >= late_min:
         return "LATE_BERRY"
-    if milk_n >= 2 and berry_n <= 1:
+    milk_stack = berry_n <= 1 and (
+        pure_milk_n >= 2
+        or (
+            pure_milk_n >= milk_pure_min
+            and dual_milk_berry_n >= milk_dual_min
+        )
+    )
+    if milk_stack:
         return "MILK_STACK"
     if berry_n >= 1:
         return "LAND_SPRINT"
-    return "LAND_SPRINT"
+    return "UNKNOWN"
+
+
+def resolve_strategy(
+    s: dict[str, Any],
+    track: dict[str, Any],
+    params: dict[str, int | float],
+    *,
+    berry_shops: frozenset[str],
+    milk_shops: frozenset[str],
+) -> MapStrategy:
+    """Locked archetype, or provisional classification before lock day."""
+    if track.get("archetype_locked"):
+        return track.get("archetype", "UNKNOWN")  # type: ignore[return-value]
+
+    first_berry = track.get("first_berry_day")
+    early_max = int(params.get("map_early_berry_day_max", 8))
+    if first_berry is not None and first_berry <= early_max:
+        return "EARLY_BERRY"
+
+    prov_min = int(params.get("map_provisional_day_min", 5))
+    if s.get("day", 0) >= prov_min:
+        return classify_archetype(
+            s,
+            track,
+            params,
+            berry_shops=berry_shops,
+            milk_shops=milk_shops,
+        )
+    return "UNKNOWN"
+
+
+def maybe_reclassify_archetype(
+    s: dict[str, Any],
+    track: dict[str, Any],
+    params: dict[str, int | float],
+    *,
+    berry_shops: frozenset[str],
+    milk_shops: frozenset[str],
+    new_berry_today: bool,
+) -> None:
+    """One-way upgrades after lock when the first berry shop opens late."""
+    if not track.get("archetype_locked") or not new_berry_today:
+        return
+    first_berry = track.get("first_berry_day")
+    early_max = int(params.get("map_early_berry_day_max", 8))
+    late_min = int(params.get("map_late_berry_day_min", 12))
+    current = track.get("archetype", "UNKNOWN")
+    fresh = classify_archetype(
+        s,
+        track,
+        params,
+        berry_shops=berry_shops,
+        milk_shops=milk_shops,
+    )
+
+    if first_berry is not None and first_berry <= early_max:
+        track["archetype"] = "EARLY_BERRY"
+        return
+    if first_berry is not None and first_berry >= late_min:
+        track["archetype"] = "LATE_BERRY"
+        return
+    if current in ("LATE_BERRY", "MILK_STACK", "UNKNOWN") and fresh == "LAND_SPRINT":
+        track["archetype"] = "LAND_SPRINT"
 
 
 def strategy_allows_berry_prep(strategy: MapStrategy) -> bool:
-    return strategy in ("LATE_BERRY", "LAND_SPRINT", "UNKNOWN")
+    return strategy in ("LATE_BERRY", "LAND_SPRINT", "MILK_STACK", "UNKNOWN")
+
+
+def strategy_land_ramp_relax_trigger_cap(
+    strategy: MapStrategy,
+    params: dict[str, int | float],
+    *,
+    n_quads: int,
+) -> int:
+    """Max empty tiles while land-ramp relax may activate (0 = never)."""
+    if n_quads == 1:
+        if strategy == "LATE_BERRY":
+            return 0
+        return int(params.get("map_land_sprint_relax_empty_max", 14))
+    if n_quads != 2:
+        return 99
+    if strategy == "LATE_BERRY":
+        return 0
+    if strategy == "LAND_SPRINT":
+        return int(params.get("map_land_sprint_relax_empty_max", 14))
+    return int(params.get("map_land_relax_empty_max", 12))
 
 
 def strategy_land_empty_cap(
@@ -50,16 +160,43 @@ def strategy_land_empty_cap(
     n_quads: int,
     relax: bool,
 ) -> int:
-    """Max empty tiles allowed before blocking land on quad 2."""
+    """Max empty tiles allowed before blocking land buys."""
     if n_quads != 2:
-        return 99
-    if strategy == "LATE_BERRY":
+        return strategy_quad1_empty_cap(strategy, params, relax=relax)
+    if not relax or strategy == "LATE_BERRY":
         return int(params["land2_empty_max"])
-    if relax and strategy == "LAND_SPRINT":
-        return int(params["late_ramp_land_empty_max"])
-    if relax:
-        return int(params["late_ramp_land_empty_max"])
-    return int(params["land2_empty_max"])
+    return int(params["late_ramp_land_empty_max"])
+
+
+def strategy_quad1_empty_cap(
+    strategy: MapStrategy,
+    params: dict[str, int | float],
+    *,
+    relax: bool,
+    seed_buy: bool = False,
+) -> int:
+    if relax and strategy != "LATE_BERRY":
+        return int(params.get("map_land_sprint_relax_empty_max", 14))
+    if seed_buy:
+        return int(params.get("map_land1_seed_empty_max", 10))
+    return int(params.get("map_land1_empty_max", 11))
+
+
+def land_ramp_relax_active(
+    strategy: MapStrategy,
+    s: dict[str, Any],
+    params: dict[str, int | float],
+    *,
+    late_shop_sprint: bool,
+    berry_gap: int,
+    n_quads: int,
+) -> bool:
+    if strategy == "LATE_BERRY" or not late_shop_sprint or berry_gap <= 0:
+        return False
+    cap = strategy_land_ramp_relax_trigger_cap(strategy, params, n_quads=n_quads)
+    if cap <= 0:
+        return False
+    return int(s.get("empty", 0)) <= cap
 
 
 def strategy_spike_sell_bump(
@@ -75,5 +212,34 @@ def strategy_spike_sell_bump(
     if s.get("day", 0) >= int(params.get("map_early_spike_day_max", 12)):
         return True
     if berry_sink >= int(params.get("map_early_spike_berry_sink_max", 2)):
+        return False
+    return True
+
+
+def strategy_defer_animals(
+    strategy: MapStrategy,
+    s: dict[str, Any],
+    flags: Any,
+    berry_gap: int,
+    params: dict[str, int | float],
+) -> bool:
+    """Whether field workers defer animal care for planting."""
+    day = s.get("day", 0)
+    empty = int(s.get("empty", 0))
+    base = (
+        (flags.berry_prep and empty >= 8)
+        or (flags.late_shop_sprint and empty >= 8)
+        or (empty >= 12 and 12 <= day <= 18 and berry_gap > 0)
+    )
+    if not base:
+        return False
+    if strategy != "MILK_STACK":
+        return True
+    milk_sink = int(s.get("milk_sink", 0) or 0)
+    milk_min = int(params.get("map_milk_defer_milk_sink_min", 2))
+    empty_max = int(params.get("map_milk_defer_empty_max", 14))
+    if milk_sink >= milk_min and empty < empty_max:
+        return False
+    if flags.late_shop_sprint and empty < int(params.get("map_milk_sprint_defer_empty_max", 12)):
         return False
     return True

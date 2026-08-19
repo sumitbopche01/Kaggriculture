@@ -96,6 +96,7 @@ class TurnPlanTests(unittest.TestCase):
             berry_replant_push=False,
             in_late_ramp=False,
             land_ramp_relax=False,
+            board_fill_pressure=False,
             need_land=False,
             berry_ok=False,
             liquidity_stress=False,

@@ -622,6 +622,33 @@ class CrewTests(unittest.TestCase):
 
 
 class LandGuardTests(unittest.TestCase):
+    def test_board_fill_blocks_third_land_with_open_berry_gap(self):
+        s = make_s(
+            day=14,
+            n_quads=2,
+            money=6000,
+            empty=12,
+            shops=["BRUNCH_SPOT", "FARMERS_MARKET"],
+            crops={"WHEAT": 6, "STRAWBERRY": 10},
+        )
+        self.assertFalse(M.need_land(s))
+
+    def test_board_fill_allows_land_when_closing_berry_gap(self):
+        prev = M._LATE_SHOP_SPRINT.get("until_day", -1)
+        try:
+            M._LATE_SHOP_SPRINT["until_day"] = 20
+            s = make_s(
+                day=16,
+                n_quads=2,
+                money=6000,
+                empty=10,
+                shops=["SMOOTHIE_SHOP"],
+                crops={"WHEAT": 6, "STRAWBERRY": 4},
+            )
+            self.assertTrue(M.need_land(s))
+        finally:
+            M._LATE_SHOP_SPRINT["until_day"] = prev
+
     def test_no_land_before_day_6(self):
         s = make_s(day=5, n_quads=1, empty=0, money=4000, shops=["FARMERS_MARKET"])
         self.assertFalse(M.need_land(s))

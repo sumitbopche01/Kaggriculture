@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from brain.map import MapStrategy, strategy_spike_sell_bump
+from brain.map import MapStrategy, strategy_defer_animals, strategy_spike_sell_bump
 
 Phase = Literal["ENGINE", "SPIKE", "LATE_RAMP", "ENDGAME", "LIQUIDATE"]
 Mode = Literal["ENGINE", "LIQUIDATE"]
@@ -43,6 +43,7 @@ class TurnFlags:
     berry_replant_push: bool
     in_late_ramp: bool
     land_ramp_relax: bool
+    board_fill_pressure: bool
     need_land: bool
     berry_ok: bool
     liquidity_stress: bool
@@ -69,8 +70,12 @@ class TurnPlan:
 
     @property
     def fill_board(self) -> bool:
-        """Field workers prioritize planting/weeding (same gates as before unification)."""
-        return self.flags.plant_sprint or self.flags.berry_ramp
+        """Field workers prioritize planting/weeding when board must be filled."""
+        return (
+            self.flags.plant_sprint
+            or self.flags.berry_ramp
+            or self.flags.board_fill_pressure
+        )
 
     @property
     def skip_animal_care(self) -> bool:
@@ -204,13 +209,16 @@ def resolve_market_route(
     return "standard"
 
 
-def resolve_defer_animals(s: dict[str, Any], flags: TurnFlags, berry_gap: int) -> bool:
-    day = s["day"]
-    empty = int(s.get("empty", 0))
-    return (
-        (flags.berry_prep and empty >= 8)
-        or (flags.late_shop_sprint and empty >= 8)
-        or (empty >= 12 and 12 <= day <= 18 and berry_gap > 0)
+def resolve_defer_animals(
+    s: dict[str, Any],
+    flags: TurnFlags,
+    berry_gap: int,
+    *,
+    strategy: MapStrategy = "UNKNOWN",
+    params: dict[str, int | float] | None = None,
+) -> bool:
+    return strategy_defer_animals(
+        strategy, s, flags, berry_gap, params or {}
     )
 
 
@@ -320,7 +328,9 @@ def build_turn_plan(
     mode: Mode = "LIQUIDATE" if phase == "LIQUIDATE" else "ENGINE"
     profile = phase_profile(phase, params)
     market_route = resolve_market_route(phase, flags, mode=mode)
-    defer = resolve_defer_animals(s, flags, berry_gap)
+    defer = resolve_defer_animals(
+        s, flags, berry_gap, strategy=strategy, params=params
+    )
 
     plan = TurnPlan(
         phase=phase,
