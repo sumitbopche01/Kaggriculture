@@ -13,6 +13,15 @@ import os
 from pathlib import Path
 from typing import Any
 
+from brain.plan import TurnFlags, TurnPlan, build_turn_plan, compute_sell_n
+from brain.map import (
+    MapStrategy,
+    classify_archetype,
+    strategy_allows_berry_prep,
+    strategy_land_empty_cap,
+    strategy_spike_sell_bump,
+)
+
 HARVEST_AGE = {"WHEAT": 4, "CARROT": 3, "MELON": 10}
 YIELD_CAP = {"WHEAT": 4, "CARROT": 3, "MELON": 6}
 ONGOING = {"TOMATO", "STRAWBERRY"}
@@ -110,8 +119,26 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     # P0 regime: ongoing late-game + spike sell + soft cap override
     "ongoing_min_days_left": 3,
     "ongoing_spike_price_factor": 2.5,
+    "spike_sell_n_min": 4,
     "spike_sell_base_mult": 3.0,
     "spike_sell_ma_mult": 1.5,
+    # Sell-slot budget (phase profiles read these)
+    "sell_n_base": 3,
+    "sell_n_build": 2,
+    "sell_n_liquidate": 8,
+    "sell_n_endgame": 5,
+    "sell_n_rescue": 5,
+    "sell_n_cash_deficit_bump": 4,
+    "sell_n_late_ongoing_bump": 4,
+    "sell_n_cash_deficit_min": 1200,
+    "land_cash_buffer_default": 800,
+    "land_post_floor_default": 1500,
+    # Map archetype router (locked at map_archetype_lock_day)
+    "map_archetype_lock_day": 8,
+    "map_early_berry_day_max": 8,
+    "map_late_berry_day_min": 12,
+    "map_early_spike_day_max": 12,
+    "map_early_spike_berry_sink_max": 2,
     "cap_override_ev_mult": 2.0,
     "cap_override_bonus_max": 4,
     "cap_override_price_factor": 2.0,
@@ -128,8 +155,21 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "seed_fill_day_max": 22,
     "endgame_days_left": 4,
     "late_shop_day_min": 12,
-    "late_shop_sprint_days": 4,
-    "late_shop_sprint_cutoff_day": 20,
+    "late_shop_sprint_days": 6,
+    "late_shop_sprint_cutoff_day": 24,
+    "late_ramp_land_empty_max": 24,
+    "late_ramp_hire_cap": 3,
+    "late_ramp_land_cash_buffer": 400,
+    "late_ramp_skip_strawberry_min": 1,
+    # P3: predictive berry prep before a late first berry shop
+    "berry_prep_enabled": 1,
+    "berry_prep_day_min": 11,
+    "berry_prep_day_max": 14,
+    "berry_prep_empty_min": 10,
+    "berry_prep_money_min": 3500,
+    "berry_prep_seed_tiles": 10,
+    "berry_prep_cash_keep": 800,
+    "berry_prep_max_seed_spend": 1200,
     # P3: market intelligence
     "glut_block_threshold": 0.35,
     "spike_harvest_mult": 1.35,
@@ -319,12 +359,41 @@ def update_shop_tracking(s: dict[str, Any]) -> None:
     shops = set(s.get("shops") or [])
     prev = set(_SHOP_TRACK.get("prev_shops") or set())
     new_berry = [sh for sh in shops if sh in BERRY_SHOPS and sh not in prev]
-    if new_berry and s["day"] >= int(PARAMS["late_shop_day_min"]):
+    if new_berry and _SHOP_TRACK.get("first_berry_day") is None:
+        _SHOP_TRACK["first_berry_day"] = s["day"]
+    first_late_berry = new_berry and not (prev & set(BERRY_SHOPS))
+    if first_late_berry and s["day"] >= int(PARAMS["late_shop_day_min"]):
         until = s["day"] + int(PARAMS["late_shop_sprint_days"])
         _LATE_SHOP_SPRINT["until_day"] = max(
             _LATE_SHOP_SPRINT.get("until_day", -1), until
         )
     _SHOP_TRACK["prev_shops"] = shops
+    _maybe_lock_archetype(s)
+
+
+def _maybe_lock_archetype(s: dict[str, Any]) -> None:
+    """Lock map archetype once at map_archetype_lock_day (default day 8)."""
+    if _SHOP_TRACK.get("archetype_locked"):
+        return
+    lock_day = int(PARAMS["map_archetype_lock_day"])
+    if s["day"] < lock_day:
+        return
+    arch = classify_archetype(
+        s,
+        _SHOP_TRACK,
+        PARAMS,
+        berry_shops=frozenset(BERRY_SHOPS),
+        milk_shops=frozenset(MILK_SHOPS),
+    )
+    _SHOP_TRACK["archetype"] = arch
+    _SHOP_TRACK["archetype_locked"] = True
+
+
+def map_strategy(s: dict[str, Any]) -> MapStrategy:
+    tp = s.get("turn_plan")
+    if tp is not None and tp.strategy != "UNKNOWN":
+        return tp.strategy
+    return _SHOP_TRACK.get("archetype", "UNKNOWN")  # type: ignore[return-value]
 
 
 def late_shop_sprint(s: dict[str, Any]) -> bool:
@@ -332,6 +401,39 @@ def late_shop_sprint(s: dict[str, Any]) -> bool:
     if s["day"] > int(PARAMS["late_shop_sprint_cutoff_day"]):
         return False
     return _LATE_SHOP_SPRINT.get("until_day", -1) >= s["day"]
+
+
+def in_late_ramp(s: dict[str, Any]) -> bool:
+    """Active post-unlock berry sprint (may overlap ENDGAME)."""
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.flags.in_late_ramp
+    return late_shop_sprint(s)
+
+
+def land_ramp_relax(s: dict[str, Any]) -> bool:
+    """Relax land empty caps only while sprinting to fill a moderate berry gap."""
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.flags.land_ramp_relax
+    return (
+        late_shop_sprint(s)
+        and berry_gap(s) > 0
+        and int(s["empty"]) <= 12
+    )
+
+
+def _compute_land_ramp_relax(s: dict[str, Any]) -> bool:
+    """Uncached land_ramp_relax for plan_turn flag collection."""
+    strat = map_strategy(s)
+    if strat == "LATE_BERRY":
+        return False
+    empty_cap = 14 if strat == "LAND_SPRINT" else 12
+    return (
+        late_shop_sprint(s)
+        and berry_gap(s) > 0
+        and int(s["empty"]) <= empty_cap
+    )
 
 
 def _cash_deficit(s: dict[str, Any]) -> float:
@@ -345,48 +447,48 @@ def _cash_deficit(s: dict[str, Any]) -> float:
     return max(0.0, planned_seed_spend - float(s.get("money", 0)))
 
 
+def berry_prep_active(s: dict[str, Any]) -> bool:
+    """Reserve land/cash for strawberries when no berry shop is open yet."""
+    if int(PARAMS["berry_prep_enabled"]) != 1:
+        return False
+    strat = map_strategy(s)
+    if strat != "UNKNOWN" and not strategy_allows_berry_prep(strat):
+        return False
+    if berry_sink(s) > 0:
+        return False
+    day = s["day"]
+    if day < int(PARAMS["berry_prep_day_min"]) or day > int(PARAMS["berry_prep_day_max"]):
+        return False
+    if float(s.get("money", 0)) < float(PARAMS["berry_prep_money_min"]):
+        return False
+    if _cash_deficit(s) >= 900:
+        return False
+    if int(s["empty"]) < int(PARAMS["berry_prep_empty_min"]):
+        return False
+    if s["n_quads"] >= 2 and int(s["empty"]) > 12:
+        return False
+    if s["n_quads"] == 1 and int(s["empty"]) > 8:
+        return False
+    if s["n_quads"] == 1 and s["empty"] > 12:
+        return False
+    return True
+
+
+def berry_prep_seed_need(
+    s: dict[str, Any], seeds: dict[str, int] | None = None
+) -> int:
+    """Strawberry seeds to stockpile before the first berry shop opens."""
+    if not berry_prep_active(s):
+        return 0
+    seeds = seeds if seeds is not None else s.get("seeds") or {}
+    have = s["crops"].get("STRAWBERRY", 0) + int(seeds.get("STRAWBERRY", 0))
+    target = min(int(s["empty"]), int(PARAMS["berry_prep_seed_tiles"]))
+    return max(0, target - have)
+
+
 def detect_regime(s: dict[str, Any]) -> dict[str, Any]:
-    """Classify the current turn for phase-aware overrides."""
-    left = days_left(s["day"])
-    demand = s.get("demand") or {}
-    demand_stack = any(
-        int(demand.get(c, 0)) >= 2 for c in ("TOMATO", "STRAWBERRY", "MILK", "EGG", "CARROT")
-    )
-    spikes = {item: price_spike(s, item) for item in BASE_PRICE}
-    price_spike_any = any(spikes.values())
-    late_ongoing = left < 8 and any(
-        px(s, c) >= int(BASE_PRICE[c]) * float(PARAMS["ongoing_spike_price_factor"])
-        for c in ONGOING
-    )
-    late_shop = late_shop_sprint(s)
-    cash_deficit = _cash_deficit(s)
-    liquidity_stress = cash_deficit >= 900
-    endgame = left <= int(PARAMS["endgame_days_left"]) or s["day"] >= int(
-        PARAMS["liquidate_day_min"]
-    )
-
-    phase = "ENGINE"
-    if s["day"] >= int(PARAMS["liquidate_day_min"]):
-        phase = "LIQUIDATE"
-    elif left <= int(PARAMS["endgame_days_left"]):
-        phase = "ENDGAME"
-    elif late_shop:
-        phase = "LATE_RAMP"
-    elif price_spike_any or demand_stack:
-        phase = "SPIKE"
-
-    regime = {
-        "phase": phase,
-        "demand_stack": demand_stack,
-        "price_spike": spikes,
-        "late_ongoing": late_ongoing,
-        "late_shop_sprint": late_shop,
-        "liquidity_stress": liquidity_stress,
-        "endgame": endgame,
-        "cash_deficit": cash_deficit,
-    }
-    s["regime"] = regime
-    return regime
+    """Classify the current turn — delegates to unified plan_turn()."""
+    return plan_turn(s).regime
 
 
 def berry_gap(s: dict[str, Any]) -> int:
@@ -401,17 +503,32 @@ def berry_gap(s: dict[str, Any]) -> int:
 
 def plant_sprint(s: dict[str, Any]) -> bool:
     """Fill empty tiles aggressively for two days after buying land."""
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.flags.plant_sprint
     if s["day"] > int(PARAMS["seed_fill_day_max"]):
         return False
     return _LAND_SPRINT.get("until_day", -1) >= s["day"]
 
 
 def berry_replant_push(s: dict[str, Any]) -> bool:
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.flags.berry_replant_push
+    if in_late_ramp(s) and berry_ok(s) and berry_gap(s) > 0:
+        return s["day"] <= int(PARAMS["late_shop_sprint_cutoff_day"])
     return 12 <= s["day"] <= 26 and berry_ok(s) and berry_gap(s) > 0
 
 
 def seed_fill_push(s: dict[str, Any]) -> bool:
     """Buy/plant aggressively after land buys or when many tiles sit empty."""
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.flags.seed_fill_push
+    if in_late_ramp(s):
+        if s["day"] > int(PARAMS["late_shop_sprint_cutoff_day"]):
+            return False
+        return plant_sprint(s) or s["empty"] >= 8
     if s["day"] > int(PARAMS["seed_fill_day_max"]):
         return False
     return plant_sprint(s) or s["empty"] >= 8
@@ -419,7 +536,10 @@ def seed_fill_push(s: dict[str, Any]) -> bool:
 
 def berry_ramp(s: dict[str, Any]) -> bool:
     """Berry shop open midgame with room to plant — ramp through day 16 (or late sprint)."""
-    late = late_shop_sprint(s)
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.flags.berry_ramp
+    late = in_late_ramp(s)
     day_max = 18 if late else 16
     gap_need = 2 if late else 3
     if not berry_ok(s) or s["day"] < 7 or s["day"] > day_max:
@@ -451,13 +571,37 @@ def _will_buy_land(s: dict[str, Any], afford: int) -> bool:
     if not need_land(s) or s["n_quads"] >= 4:
         return False
     cost = LAND_COST[s["n_quads"] - 1]
-    if int(s["money"]) < land_bundle_cost(s):
+    tp = s.get("turn_plan")
+    ramp = tp.flags.in_late_ramp if tp else in_late_ramp(s)
+    prof = tp.profile if tp else None
+    seed_buffer = (
+        prof.land_cash_buffer
+        if prof and ramp
+        else (
+            int(PARAMS["late_ramp_land_cash_buffer"])
+            if ramp
+            else int(PARAMS["land_cash_buffer_default"])
+        )
+    )
+    post_land_floor = (
+        prof.post_land_floor
+        if prof and ramp
+        else (
+            int(PARAMS["late_ramp_land_cash_buffer"])
+            if ramp
+            else int(PARAMS["land_post_floor_default"])
+        )
+    )
+    if ramp:
+        if int(s["money"]) < cost + seed_buffer:
+            return False
+    elif int(s["money"]) < land_bundle_cost(s):
         return False
-    if afford < cost + 800:
+    if afford < cost + seed_buffer:
         return False
-    if s["n_quads"] >= 2 and afford - cost < 1500:
+    if s["n_quads"] >= 2 and afford - cost < post_land_floor:
         return False
-    if not cash_shop(s):
+    if not cash_shop(s) and not ramp:
         best_ev = max((plan_ev(s, c) for c in s["scores"]), default=0.0)
         if best_ev * 25 * max(3, days_left(s["day"]) // 2) < cost:
             return False
@@ -641,6 +785,9 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
     Allocate cash tiles to the most profitable cash crops available from the
     currently open shops (and melon as an EV-based fallback).
     """
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.crops
     _, room, wheat_tiles = tile_budget(s)
     plan = {c: 0 for c in SEED_COST}
     plan["WHEAT"] = wheat_tiles
@@ -826,6 +973,7 @@ def want_geese(s: dict[str, Any]) -> int:
 
 
 def need_land(s: dict[str, Any]) -> bool:
+    ramp = in_late_ramp(s)
     if (
         s["day"] < PARAMS["land_day_min"]
         or s["n_quads"] >= PARAMS["max_quads_for_land"]
@@ -835,21 +983,22 @@ def need_land(s: dict[str, Any]) -> bool:
         return False
     if s["n_quads"] == 2 and s["day"] >= PARAMS["land2_day_max"]:
         return False
-    if s["n_quads"] == 1 and s["empty"] > 10:
+    if s["n_quads"] == 1 and s["empty"] > (14 if land_ramp_relax(s) else 10):
         return False
     _, cash_room, _ = tile_budget(s)
     if s["n_quads"] == 1:
-        # Winners often buy land slightly before the board is fully filled,
-        # as long as there is cash-shop demand to fund the next reinvest.
-        if s["empty"] > 11:
+        empty_max = 14 if land_ramp_relax(s) else 11
+        if s["empty"] > empty_max:
             return False
         if s["empty"] <= 8:
             return True
-        if s["empty"] <= 11 and cash_shop(s) and s["day"] <= 7:
+        if s["empty"] <= empty_max and cash_shop(s) and s["day"] <= 7:
             return True
         if cash_room <= 4 and cash_shop(s):
             return True
-        if s["seeds"].get("STRAWBERRY", 0) >= 4 and s["empty"] <= 10:
+        if s["seeds"].get("STRAWBERRY", 0) >= 4 and s["empty"] <= (
+            12 if land_ramp_relax(s) else 10
+        ):
             return True
         return False
     if s["n_quads"] == 2:
@@ -857,12 +1006,87 @@ def need_land(s: dict[str, Any]) -> bool:
             return False
         if int(s["money"]) < PARAMS["land2_money_min"]:
             return False
-        if s["empty"] > PARAMS["land2_empty_max"]:
+        strat = map_strategy(s)
+        relax = land_ramp_relax(s)
+        empty_max = int(PARAMS["land2_empty_max"])
+        if relax:
+            empty_max = strategy_land_empty_cap(
+                strat, PARAMS, n_quads=2, relax=True
+            )
+        if s["empty"] > empty_max:
             return False
-        if berry_ok(s) and s["crops"]["STRAWBERRY"] < PARAMS["land2_strawberry_min"]:
+        skip_berry_min = land_ramp_relax(s) and int(
+            PARAMS["late_ramp_skip_strawberry_min"]
+        ) == 1
+        if (
+            not skip_berry_min
+            and berry_ok(s)
+            and s["crops"]["STRAWBERRY"] < PARAMS["land2_strawberry_min"]
+        ):
             return False
         return True
     return False
+
+
+def plan_turn(s: dict[str, Any]) -> TurnPlan:
+    """Single planning pass: crop targets, regime phase, market route, field mode."""
+    crops = crop_plan(s)
+    berry_gap_n = max(
+        0,
+        crops.get("STRAWBERRY", 0)
+        - s["crops"].get("STRAWBERRY", 0)
+        - int(s["seeds"].get("STRAWBERRY", 0)),
+    )
+    left = days_left(s["day"])
+    demand = s.get("demand") or {}
+    demand_stack = any(
+        int(demand.get(c, 0)) >= 2
+        for c in ("TOMATO", "STRAWBERRY", "MILK", "EGG", "CARROT")
+    )
+    spikes = {item: price_spike(s, item) for item in BASE_PRICE}
+    late_ongoing = left < 8 and any(
+        px(s, c) >= int(BASE_PRICE[c]) * float(PARAMS["ongoing_spike_price_factor"])
+        for c in ONGOING
+    )
+    lshop = late_shop_sprint(s)
+    prep = berry_prep_active(s)
+    cash_deficit = _cash_deficit(s)
+    liquidity_stress = cash_deficit >= 900
+    endgame = left <= int(PARAMS["endgame_days_left"]) or s["day"] >= int(
+        PARAMS["liquidate_day_min"]
+    )
+    bok = crops.get("STRAWBERRY", 0) > 0
+    # Collect flags before turn_plan exists (helpers fall through to live compute).
+    flags = TurnFlags(
+        late_shop_sprint=lshop,
+        berry_prep=prep,
+        plant_sprint=plant_sprint(s),
+        berry_ramp=berry_ramp(s),
+        seed_fill_push=seed_fill_push(s),
+        berry_replant_push=berry_replant_push(s),
+        in_late_ramp=lshop,
+        land_ramp_relax=_compute_land_ramp_relax(s),
+        need_land=need_land(s),
+        berry_ok=bok,
+        liquidity_stress=liquidity_stress,
+        late_ongoing=late_ongoing,
+        demand_stack=demand_stack,
+        price_spike=spikes,
+    )
+    tp = build_turn_plan(
+        s,
+        PARAMS,
+        crops=crops,
+        berry_gap=berry_gap_n,
+        flags=flags,
+        cash_deficit=cash_deficit,
+        days_left=left,
+        endgame=endgame,
+        strategy=map_strategy(s),
+    )
+    s["turn_plan"] = tp
+    s["regime"] = tp.regime
+    return tp
 
 
 def want_hands(s: dict[str, Any]) -> int:
@@ -1008,6 +1232,9 @@ def read_signals(obs: dict[str, Any]) -> dict[str, Any]:
 
 
 def pick_mode(s: dict[str, Any]) -> str:
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.mode
     if s["day"] >= int(PARAMS["liquidate_day_min"]):
         return "LIQUIDATE"
     return "ENGINE"
@@ -1050,6 +1277,14 @@ def pick_crop(s: dict[str, Any], seeds: dict[str, int]) -> str | None:
     ]
     if cash:
         return max(cash, key=lambda c: plan_ev(s, c))
+    if (
+        in_late_ramp(s)
+        and s["day"] <= int(PARAMS["late_shop_sprint_cutoff_day"])
+        and seeds.get("STRAWBERRY", 0) > 0
+        and s["empty"] >= 2
+        and (berry_gap(s) > 0 or berry_ok(s))
+    ):
+        return "STRAWBERRY"
     if (
         berry_ok(s)
         and s["day"] <= 26
@@ -1137,7 +1372,7 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                         and hungry == 0
                         and fert_ready == 0
                         and not ctx.get("skip_care")
-                        and not ctx.get("plant_sprint")
+                        and not ctx.get("fill_board")
                     ):
                         priority = 3
                 elif ctx["carried"] and ANIMAL_STRUCT.get(ctx["carried"]) == t.get(
@@ -1146,7 +1381,7 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                     priority = 2
             elif isinstance(t, dict) and t.get("kind") == "WEED":
                 if hungry == 0:
-                    if ctx.get("plant_sprint") or ctx.get("berry_ramp"):
+                    if ctx.get("fill_board"):
                         priority = 0
                         urgency = 8
                     elif ctx.get("cash_waiting"):
@@ -1159,7 +1394,7 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                 waiting_plant = ctx.get("cash_waiting") or ctx.get("wheat_waiting")
                 waiting_berry = ctx.get("berry_waiting")
                 if (
-                    (ctx.get("plant_sprint") or ctx.get("berry_ramp"))
+                    ctx.get("fill_board")
                     and hungry == 0
                     and has_seeds
                     and (waiting_plant or waiting_berry)
@@ -1495,6 +1730,25 @@ def _maybe_buy_land(market: list, afford: int, s: dict[str, Any]) -> int:
     return afford - cost
 
 
+def _buy_berry_prep_seeds(
+    market: list,
+    afford: int,
+    s: dict[str, Any],
+    seeds: dict[str, int],
+) -> int:
+    """Stockpile strawberry seeds before the first berry shop opens."""
+    need = berry_prep_seed_need(s, seeds)
+    if need <= 0 or afford <= 0 or len(market) >= MARKET_LIMIT:
+        return afford
+    keep = int(PARAMS["berry_prep_cash_keep"])
+    max_n = max(1, int(PARAMS["berry_prep_max_seed_spend"]) // SEED_COST["STRAWBERRY"])
+    n_before = len(market)
+    afford = _append_seed(market, afford, "STRAWBERRY", min(need, max_n), keep=keep)
+    if len(market) > n_before:
+        seeds["STRAWBERRY"] = seeds.get("STRAWBERRY", 0) + int(market[-1][2])
+    return afford
+
+
 def _buy_planned_seeds(
     market: list,
     afford: int,
@@ -1517,8 +1771,11 @@ def _buy_planned_seeds(
         cap_n = max(cap_n, 8)
     if seed_fill_push(s):
         cap_n = max(cap_n, min(16, s["empty"]))
-    if late_shop_sprint(s):
-        cap_n = max(cap_n, 12)
+    tp = s.get("turn_plan")
+    if tp is not None and tp.flags.late_shop_sprint:
+        cap_n = max(cap_n, 16)
+    elif late_shop_sprint(s):
+        cap_n = max(cap_n, 16)
     for c in CASH_PLANT:
         if uptrend_frontrun(s, c) and plan.get(c, 0) > 0:
             cap_n = max(cap_n, int(PARAMS["frontrun_cap_bonus"]))
@@ -1796,42 +2053,40 @@ def _fork_signals(s: dict[str, Any]) -> dict[str, Any]:
     s2["seeds"] = dict(s["seeds"])
     s2["shed"] = dict(s["shed"])
     s2["crops"] = dict(s["crops"])
+    s2["regime"] = s.get("regime")
+    s2["turn_plan"] = s.get("turn_plan")
     return s2
+
+
+def _compute_sell_n(s: dict[str, Any], mode: str) -> int:
+    """Unified sell-slot budget for market planning and harvest inventory targets."""
+    tp = s.get("turn_plan")
+    if tp is None:
+        plan_turn(s)
+        tp = s["turn_plan"]
+    return compute_sell_n(
+        tp,
+        s,
+        PARAMS,
+        mode=mode,  # type: ignore[arg-type]
+        base_prices=BASE_PRICE,
+        px=px,
+        ongoing_crops=ONGOING,
+    )
 
 
 def _start_market(s: dict[str, Any], mode: str) -> tuple[list, int, dict[str, Any]]:
     s2 = _fork_signals(s)
     market: list = []
     shed = s2["shed"]
-    if mode == "LIQUIDATE":
-        sell_n = 8
-    elif (berry_ok(s2) and berry_gap(s2) > 0) or need_land(s2):
-        sell_n = 2
-    else:
-        sell_n = 3
-
-    # Liquidity pressure: if we’re short on cash for the next planned
-    # seed expansion, sell more aggressively (still filtered by
-    # `_sell_score()` so we only liquidate when it’s economically sound).
-    plan = crop_plan(s2)
-    planned_seed_spend = 0
-    for c in CASH_PLANT:
-        target = plan.get(c, 0)
-        have = s2["crops"].get(c, 0) + s2["seeds"].get(c, 0)
-        need = max(0, target - have)
-        planned_seed_spend += need * SEED_COST[c]
-    cash_deficit = max(0, planned_seed_spend - float(s2.get("money", 0)))
-    if mode != "LIQUIDATE" and cash_deficit >= 1200:
-        sell_n = max(sell_n, 4)
-    rescue = (
+    cash_deficit = float((s2.get("regime") or {}).get("cash_deficit", _cash_deficit(s2)))
+    s2["liquidity_rescue"] = (
         mode != "LIQUIDATE"
         and s2.get("day", 0) <= int(PARAMS["liquidity_rescue_day_max"])
         and s2.get("empty", 0) >= 8
         and cash_deficit >= 900
     )
-    if rescue:
-        sell_n = max(sell_n, 5)
-    s2["liquidity_rescue"] = rescue
+    sell_n = _compute_sell_n(s2, mode)
 
     proceeds = _sell_goods(market, s2, shed, max_actions=sell_n)
     wheat = shed.get("WHEAT", 0)
@@ -1937,11 +2192,38 @@ def market_for(s: dict[str, Any], mode: str) -> list:
     if day == 0:
         return []
 
+    if "turn_plan" not in s:
+        plan_turn(s)
+    tp = s["turn_plan"]
+
     market, afford, s2 = _start_market(s, mode)
-    berry_gap_start = berry_gap(s)
+    berry_gap_start = tp.berry_gap
     if mode == "LIQUIDATE":
         afford = _hire_up_to(market, afford, s2)
         return _pack_market(market)
+
+    if tp.market_route == "late_sprint" and (s2["empty"] >= 8 or berry_gap_start > 0):
+        if need_land(s2):
+            afford = _maybe_buy_land(market, afford, s2)
+        hire_cap = tp.profile.hire_cap or HIRES_PER_TURN
+        hire_n = min(_hire_budget(s2, market, reserve_land=False), hire_cap)
+        afford = _hire_up_to(market, afford, s2, hire_n)
+        afford = _buy_planned_seeds(
+            market, afford, s2, s2["seeds"], berry_only=True
+        )
+        afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
+        afford = _buy_feed_wheat(market, afford, s2)
+        return _pack_market(market)
+
+    if tp.market_route == "berry_prep":
+        afford = _maybe_buy_land(market, afford, s2)
+        hire_cap = tp.profile.hire_cap or HIRES_PER_TURN
+        hire_n = min(
+            _hire_budget(s2, market, reserve_land=need_land(s2)),
+            hire_cap,
+        )
+        afford = _hire_up_to(market, afford, s2, hire_n)
+        afford = _buy_berry_prep_seeds(market, afford, s2, s2["seeds"])
 
     can_land = _will_buy_land(s2, afford)
     prep_land = can_land and cash_shop(s2)
@@ -1954,56 +2236,46 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         afford = _maybe_buy_land(market, afford, s2)
         hire_n = _hire_budget(s2, market, reserve_land=False)
         afford = _hire_up_to(market, afford, s2, hire_n)
-        if berry_ramp(s2):
-            ramp_conservative = not seed_fill_push(s2)
+        if tp.flags.berry_ramp:
+            ramp_conservative = not tp.flags.seed_fill_push
             afford = _buy_planned_seeds(
                 market, afford, s2, s2["seeds"], berry_only=ramp_conservative
             )
     afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
     afford = _buy_planned_seeds(market, afford, s2, s2["seeds"])
     afford = _buy_feed_wheat(market, afford, s2)
-    defer_animals = s2["empty"] >= 12 and 12 <= s2["day"] <= 18 and berry_gap_start > 0
-    if afford >= 1200 and len(market) < MARKET_LIMIT and not defer_animals:
+    if afford >= 1200 and len(market) < MARKET_LIMIT and not tp.defer_animals:
         _buy_animals(market, afford, s2)
     return _pack_market(market)
 
 
 def agent(obs: dict[str, Any]) -> dict[str, Any]:
+    global _LAND_SPRINT, _LATE_SHOP_SPRINT, _SHOP_TRACK, _UPTREND_HOURS
+    if obs.get("day", 0) == 0 and (obs.get("hour") or 0) == 0:
+        _LAND_SPRINT["until_day"] = -1
+        _LATE_SHOP_SPRINT["until_day"] = -1
+        _SHOP_TRACK["prev_shops"] = set()
+        _SHOP_TRACK["first_berry_day"] = None
+        _SHOP_TRACK["archetype"] = "UNKNOWN"
+        _SHOP_TRACK["archetype_locked"] = False
+        _UPTREND_HOURS.clear()
+
     s = read_signals(obs)
     update_price_book(s)
     update_shop_tracking(s)
     update_uptrend_tracking(s)
     refresh_planning_scores(s)
-    detect_regime(s)
-    mode = pick_mode(s)
+    tp = plan_turn(s)
+    mode = tp.mode
     market = []
     seeds = dict(s["seeds"])
     claimed = set()
     n_feeders = min(s["workers"], s["hungry"]) if s["hungry"] else 0
     early_wheat = s["hungry"] > 0 and s["shed"].get("WHEAT", 0) == 0
-    sprint = plant_sprint(s)
-    ramp = berry_ramp(s)
-    plan = crop_plan(s)
-    # Sell-horizon aware inventory targets for harvest prioritization.
-    # Approximate liquidation capacity with the same `sell_n` logic used in
-    # `_start_market()`, including the liquidity bump.
-    sell_n_est = (
-        8
-        if mode == "LIQUIDATE"
-        else (2 if ((berry_ok(s) and berry_gap(s) > 0) or need_land(s)) else 3)
-    )
-    planned_seed_spend = 0
-    for c in CASH_PLANT:
-        target = plan.get(c, 0)
-        have = s["crops"].get(c, 0) + s["seeds"].get(c, 0)
-        need = max(0, target - have)
-        planned_seed_spend += need * SEED_COST[c]
-    cash_deficit = max(0, planned_seed_spend - float(s.get("money", 0)))
-    regime = s.get("regime") or {}
-    if mode != "LIQUIDATE" and cash_deficit >= 1200:
-        sell_n_est = max(sell_n_est, 4)
-    if regime.get("phase") == "ENDGAME":
-        sell_n_est = max(sell_n_est, 5)
+    sprint = tp.flags.plant_sprint
+    ramp = tp.flags.berry_ramp
+    plan = tp.crops
+    sell_n_est = _compute_sell_n(s, mode)
 
     inventory_target: dict[str, float] = {}
     inventory_stock: dict[str, float] = {}
@@ -2026,8 +2298,10 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
         "early_wheat": early_wheat,
         "plant_sprint": sprint,
         "berry_ramp": ramp,
+        "fill_board": tp.fill_board,
+        "harvest_focus": tp.harvest_focus,
         "berry_waiting": (
-            seeds.get("STRAWBERRY", 0) > 0 and berry_ok(s) and berry_gap(s) > 0
+            seeds.get("STRAWBERRY", 0) > 0 and tp.flags.berry_ok and tp.berry_gap > 0
         ),
         "cash_seeds": (
             seeds.get("STRAWBERRY", 0) > 0

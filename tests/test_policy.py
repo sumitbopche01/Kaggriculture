@@ -705,5 +705,117 @@ class LandGuardTests(unittest.TestCase):
         self.assertTrue(M.need_land(s))
 
 
+class SellNTests(unittest.TestCase):
+    def test_compute_sell_n_engine_default(self):
+        s = make_s(day=10, shops=["FARMERS_MARKET"], crops={"WHEAT": 6, "STRAWBERRY": 8})
+        M.detect_regime(s)
+        self.assertEqual(M._compute_sell_n(s, "ENGINE"), 3)
+
+    def test_compute_sell_n_spike_with_held_inventory(self):
+        s = make_s(
+            day=20,
+            shops=["SMOOTHIE_SHOP", "BRUNCH_SPOT"],
+            crops={"WHEAT": 6, "STRAWBERRY": 12},
+            shed={"WHEAT": 4, "STRAWBERRY": 6},
+        )
+        s["prices"]["STRAWBERRY"] = 400
+        M.update_price_book(s)
+        M.refresh_planning_scores(s)
+        M.detect_regime(s)
+        self.assertEqual(s["regime"]["phase"], "SPIKE")
+        self.assertGreaterEqual(M._compute_sell_n(s, "ENGINE"), M.PARAMS["spike_sell_n_min"])
+
+
+class LateRampTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._prev_sprint = M._LATE_SHOP_SPRINT.get("until_day", -1)
+
+    def tearDown(self) -> None:
+        M._LATE_SHOP_SPRINT["until_day"] = self._prev_sprint
+
+    def test_need_land_2q_late_ramp_allows_sparse_berries(self):
+        M._LATE_SHOP_SPRINT["until_day"] = 20
+        s = make_s(
+            day=16,
+            n_quads=2,
+            money=6000,
+            empty=10,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6, "STRAWBERRY": 4},
+        )
+        self.assertTrue(M.in_late_ramp(s))
+        self.assertTrue(M.need_land(s))
+
+    def test_need_land_2q_engine_still_requires_berry_fill(self):
+        M._LATE_SHOP_SPRINT["until_day"] = -1
+        s = make_s(
+            day=14,
+            n_quads=2,
+            money=6000,
+            empty=4,
+            shops=["BRUNCH_SPOT"],
+            crops={"WHEAT": 6, "STRAWBERRY": 12},
+        )
+        self.assertFalse(M.in_late_ramp(s))
+        self.assertFalse(M.need_land(s))
+
+    def test_late_ramp_market_skips_animals(self):
+        M._LATE_SHOP_SPRINT["until_day"] = 20
+        s = make_s(
+            day=16,
+            hour=1,
+            n_quads=2,
+            money=12000,
+            empty=10,
+            cows=2,
+            sheep=2,
+            shops=["SMOOTHIE_SHOP", "BRUNCH_SPOT"],
+            crops={"WHEAT": 6, "STRAWBERRY": 8},
+        )
+        M.detect_regime(s)
+        market = M.market_for(s, "ENGINE")
+        self.assertFalse(any(a and a[0] == "BUY_ANIMAL" for a in market))
+        self.assertTrue(
+            any(a and a[0] == "BUY_SEED" and a[1] == "STRAWBERRY" for a in market)
+            or any(a and a[0] == "BUY_LAND" for a in market)
+        )
+
+
+class BerryPrepTests(unittest.TestCase):
+    def test_berry_prep_inactive_when_berry_shop_open(self):
+        s = make_s(day=11, shops=["SMOOTHIE_SHOP"], money=5000)
+        self.assertFalse(M.berry_prep_active(s))
+
+    def test_berry_prep_active_before_first_shop(self):
+        s = make_s(day=12, shops=[], money=5000, empty=11, n_quads=2)
+        self.assertTrue(M.berry_prep_active(s))
+        self.assertGreater(M.berry_prep_seed_need(s), 0)
+
+    def test_berry_prep_inactive_on_day_10(self):
+        s = make_s(day=10, shops=[], money=5000, empty=15, n_quads=2)
+        self.assertFalse(M.berry_prep_active(s))
+
+    def test_berry_prep_active_on_day_11_without_shop(self):
+        s = make_s(day=11, shops=[], money=5000, empty=11, n_quads=2)
+        self.assertTrue(M.berry_prep_active(s))
+
+    def test_berry_prep_market_buys_strawberry_seeds(self):
+        s = make_s(
+            day=12,
+            hour=1,
+            shops=[],
+            money=8000,
+            empty=11,
+            n_quads=2,
+            cows=2,
+            sheep=2,
+            crops={"WHEAT": 6},
+        )
+        market = M.market_for(s, "ENGINE")
+        self.assertTrue(
+            any(a and a[0] == "BUY_SEED" and a[1] == "STRAWBERRY" for a in market)
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

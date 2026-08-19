@@ -11,3 +11,6 @@ replay.json
 credentials.json
 kaggle.json
 .kaggle_cli
+tune/optuna.db
+tune/_*
+analysis/*.csv
