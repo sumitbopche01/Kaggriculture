@@ -149,7 +149,6 @@ class FeedAndWheatTests(unittest.TestCase):
         )
         self.assertEqual(M.want_cows(s), 2)
 
-    @unittest.skip("herd_can_expand not in P1/P2 scope")
     def test_herd_blocked_without_wheat_buffer(self):
         s = make_s(
             n_quads=2,
@@ -162,7 +161,19 @@ class FeedAndWheatTests(unittest.TestCase):
         self.assertFalse(M.herd_can_expand(s))
         self.assertEqual(M.want_cows(s), 4)
 
-    @unittest.skip("want_geese not in P1/P2 scope")
+    def test_cows_expand_when_wheat_buffer_is_healthy(self):
+        s = make_s(
+            n_quads=2,
+            cows=2,
+            sheep=2,
+            shops=["PIZZA_SHOP"],
+            crops={"WHEAT": 8},
+            shed={"WHEAT": 4},
+            prices={**M.BASE_PRICE, "MILK": 160},
+        )
+        self.assertTrue(M.herd_can_expand(s))
+        self.assertEqual(M.want_cows(s), 3)
+
     def test_bakery_wants_geese(self):
         s = make_s(
             n_quads=2,
@@ -175,6 +186,13 @@ class FeedAndWheatTests(unittest.TestCase):
             shops=["BAKERY"],
         )
         self.assertGreaterEqual(M.want_geese(s), 1)
+        market: list = []
+        s["empty"] = 8
+        M._buy_animals(market, 5000, s)
+        self.assertFalse(
+            any(a and a[0] == "BUY_ANIMAL" and a[1] == "GOOSE" for a in market),
+            "geese buys starve berry/herd maps; want_geese is advisory only",
+        )
 
 
 class CropPlanTests(unittest.TestCase):
@@ -363,22 +381,202 @@ class SprintAndReplantTests(unittest.TestCase):
         hires_before = sum(1 for a in market[:land_i] if a and a[0] == "HIRE")
         self.assertGreaterEqual(hires_before, 1)
 
-    def test_berry_push_blocks_animals_when_gap_large(self):
+    def test_wheat_gate_blocks_animals_when_buffer_thin(self):
         s = make_s(
             day=18,
             n_quads=2,
             cows=4,
             sheep=2,
             money=5000,
-            shops=["FARMERS_MARKET"],
-            crops={"WHEAT": 8, "STRAWBERRY": 4},
+            shops=["PIZZA_SHOP", "FARMERS_MARKET"],
+            crops={"WHEAT": 5, "STRAWBERRY": 20},
             seeds={"STRAWBERRY": 0},
-            shed={"COW": 0, "SHEEP": 0, "GOOSE": 0},
+            shed={"COW": 0, "SHEEP": 0, "GOOSE": 0, "WHEAT": 1},
         )
-        self.assertGreaterEqual(M.berry_gap(s), 6)
+        self.assertFalse(M.herd_can_expand(s))
         market: list = []
         M._buy_animals(market, 5000, s)
         self.assertFalse(any(a and a[0] == "BUY_ANIMAL" for a in market))
+
+
+class LateShopTests(unittest.TestCase):
+    def test_berry_ramp_when_shop_opens_midgame(self):
+        s = make_s(
+            day=10,
+            n_quads=1,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6, "STRAWBERRY": 2},
+            seeds={"STRAWBERRY": 0},
+            empty=8,
+        )
+        self.assertTrue(M.berry_ramp(s))
+        self.assertTrue(M.berry_seed_push(s))
+
+    def test_berry_ramp_off_before_day_8(self):
+        s = make_s(
+            day=6,
+            n_quads=1,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6, "STRAWBERRY": 0},
+            seeds={"STRAWBERRY": 0},
+            empty=10,
+        )
+        self.assertFalse(M.berry_ramp(s))
+
+    def test_berry_ramp_off_when_board_is_filled(self):
+        s = make_s(
+            day=14,
+            n_quads=1,
+            shops=["FARMERS_MARKET"],
+            crops={"WHEAT": 6, "STRAWBERRY": 8},
+            seeds={"STRAWBERRY": 0},
+            empty=6,
+        )
+        self.assertFalse(M.berry_ramp(s))
+
+    def test_berry_ramp_continues_on_two_quads_past_eight(self):
+        s = make_s(
+            day=12,
+            n_quads=2,
+            shops=["FARMERS_MARKET"],
+            crops={"WHEAT": 6, "STRAWBERRY": 8},
+            seeds={"STRAWBERRY": 0},
+            empty=10,
+        )
+        self.assertTrue(M.berry_ramp(s))
+
+    def test_late_shop_buys_berries_before_wheat(self):
+        s = make_s(
+            day=10,
+            hour=1,
+            n_quads=1,
+            money=2500,
+            workers=6,
+            hires_today=0,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6, "STRAWBERRY": 2},
+            seeds={"STRAWBERRY": 0, "WHEAT": 0},
+            empty=10,
+        )
+        market = M.market_for(s, "ENGINE")
+        berry = next(
+            (i for i, a in enumerate(market) if a and a[0] == "BUY_SEED" and a[1] == "STRAWBERRY"),
+            None,
+        )
+        wheat = next(
+            (i for i, a in enumerate(market) if a and a[0] == "BUY_SEED" and a[1] == "WHEAT"),
+            None,
+        )
+        self.assertIsNotNone(berry, f"expected berry seed buy: {market}")
+        if wheat is not None:
+            self.assertLess(berry, wheat)
+
+    def test_late_shop_pick_crop_before_extra_wheat(self):
+        s = make_s(
+            day=10,
+            n_quads=1,
+            cows=2,
+            sheep=2,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6, "STRAWBERRY": 2},
+            seeds={"STRAWBERRY": 4, "WHEAT": 4},
+        )
+        self.assertEqual(M.pick_crop(s, dict(s["seeds"])), "STRAWBERRY")
+
+
+class MarketSlotTests(unittest.TestCase):
+    def test_pack_keeps_berry_seeds_when_over_cap(self):
+        packed = M._pack_market(
+            [
+                ["SELL", "MILK", 2],
+                ["SELL", "WOOL", 2],
+                ["SELL", "FERTILIZER", 2],
+                ["HIRE"],
+                ["HIRE"],
+                ["HIRE"],
+                ["HIRE"],
+                ["HIRE"],
+                ["BUY_LAND"],
+                ["BUY_SEED", "WHEAT", 6],
+                ["BUY_SEED", "STRAWBERRY", 8],
+                ["BUY_ANIMAL", "COW", 1],
+            ]
+        )
+        self.assertLessEqual(len(packed), M.MARKET_LIMIT)
+        self.assertTrue(any(a[0] == "BUY_SEED" and a[1] == "STRAWBERRY" for a in packed))
+        self.assertTrue(any(a[0] == "BUY_LAND" for a in packed))
+        self.assertTrue(any(a[0] == "BUY_SEED" and a[1] == "WHEAT" for a in packed))
+
+    def test_pack_keeps_feed_wheat_product(self):
+        packed = M._pack_market(
+            [["HIRE"]] * 8
+            + [["BUY_ANIMAL", "COW", 1], ["BUY_PRODUCT", "WHEAT", 4], ["BUY_SEED", "TOMATO", 2]]
+        )
+        self.assertTrue(any(a[0] == "BUY_PRODUCT" and a[1] == "WHEAT" for a in packed))
+        self.assertLessEqual(len(packed), M.MARKET_LIMIT)
+
+    def test_coalesce_merges_duplicate_berry_buys(self):
+        packed = M._coalesce_seed_buys(
+            [["BUY_SEED", "STRAWBERRY", 4], ["HIRE"], ["BUY_SEED", "STRAWBERRY", 4]]
+        )
+        berries = [a for a in packed if a[0] == "BUY_SEED" and a[1] == "STRAWBERRY"]
+        self.assertEqual(len(berries), 1)
+        self.assertEqual(berries[0][2], 8)
+
+    def test_hire_budget_leaves_slot_for_berries(self):
+        s = make_s(
+            day=10,
+            n_quads=1,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6, "STRAWBERRY": 2},
+            seeds={"STRAWBERRY": 0},
+            empty=8,
+            hires_today=0,
+        )
+        market = [["SELL", "MILK", 1], ["SELL", "WOOL", 1], ["SELL", "FERTILIZER", 1]]
+        n = M._hire_budget(s, market, reserve_land=True)
+        self.assertLessEqual(n, 5)
+        self.assertGreaterEqual(n, 1)
+
+
+class WeedPathingTests(unittest.TestCase):
+    def test_nearest_job_paths_to_weeds_when_cash_waiting(self):
+        tiles = [[None, {"kind": "WEED"}, None], [None, None, None]]
+        ctx = {
+            "hungry": 0,
+            "fert_ready": 0,
+            "skip_care": False,
+            "plant_sprint": False,
+            "berry_ramp": False,
+            "cash_waiting": True,
+            "wheat_waiting": False,
+            "berry_waiting": False,
+            "need_pasture": False,
+            "need_coop": False,
+            "carried": None,
+            "use_fert": False,
+        }
+        target = M.nearest_job(tiles, 0, 0, 10, set(), False, False, False, ctx)
+        self.assertEqual(target, (1, 0))
+
+    def test_nearest_job_digs_weeds_during_sprint_first(self):
+        tiles = [[None, {"kind": "WEED"}, None], [None, None, None]]
+        ctx = {
+            "hungry": 0,
+            "fert_ready": 0,
+            "skip_care": False,
+            "plant_sprint": True,
+            "berry_ramp": False,
+            "cash_waiting": False,
+            "wheat_waiting": False,
+            "berry_waiting": False,
+            "need_pasture": False,
+            "need_coop": False,
+            "carried": None,
+            "use_fert": False,
+        }
+        target = M.nearest_job(tiles, 0, 0, 10, set(), True, False, False, ctx)
+        self.assertEqual(target, (1, 0))
 
 
 class CrewTests(unittest.TestCase):
