@@ -174,6 +174,30 @@ class FeedAndWheatTests(unittest.TestCase):
         self.assertTrue(M.herd_can_expand(s))
         self.assertEqual(M.want_cows(s), 3)
 
+    def test_two_quad_cow_cap_is_ten(self):
+        s = make_s(
+            n_quads=2,
+            cows=9,
+            sheep=2,
+            shops=["PIZZA_SHOP"],
+            crops={"WHEAT": 16},
+            shed={"WHEAT": 8},
+            prices={**M.BASE_PRICE, "MILK": 160},
+        )
+        self.assertEqual(M.want_cows(s), 10)
+
+    def test_hold_milk_when_price_is_dumped(self):
+        s = make_s(
+            day=10,
+            shops=["PIZZA_SHOP"],
+            shed={"MILK": 8, "FERTILIZER": 0, "WOOL": 0},
+        )
+        s["mean3"] = {"MILK": 180}
+        s["prices"] = {**M.BASE_PRICE, "MILK": 40}
+        market: list = []
+        M._sell_goods(market, s, dict(s["shed"]), max_actions=4)
+        self.assertFalse(any(a[0] == "SELL" and a[1] == "MILK" for a in market))
+
     def test_bakery_wants_geese(self):
         s = make_s(
             n_quads=2,
@@ -384,6 +408,7 @@ class SprintAndReplantTests(unittest.TestCase):
     def test_wheat_gate_blocks_animals_when_buffer_thin(self):
         s = make_s(
             day=18,
+            hour=0,
             n_quads=2,
             cows=4,
             sheep=2,
@@ -594,6 +619,10 @@ class CrewTests(unittest.TestCase):
 
 
 class LandGuardTests(unittest.TestCase):
+    def test_no_land_before_day_6(self):
+        s = make_s(day=5, n_quads=1, empty=0, money=4000, shops=["FARMERS_MARKET"])
+        self.assertFalse(M.need_land(s))
+
     def test_no_land_before_day_4(self):
         s = make_s(day=2, n_quads=1, empty=0, money=4000, shops=["FARMERS_MARKET"])
         self.assertFalse(M.need_land(s))
@@ -664,7 +693,7 @@ class LandGuardTests(unittest.TestCase):
             day=14,
             n_quads=2,
             money=6000,
-            empty=5,
+            empty=4,
             cows=2,
             sheep=2,
             shops=["BRUNCH_SPOT", "FARMERS_MARKET"],

@@ -283,7 +283,12 @@ def live_ev(s: dict[str, Any], crop: str) -> float:
 def tile_budget(s: dict[str, Any]) -> tuple[int, int, int]:
     tiles = s["n_quads"] * 25
     mouths = mouths_of(s)
-    wheat_tiles = max(6, mouths) if mouths else 4
+    # Slice A: keep wheat ahead of mouths (`mouths + 2`) early on
+    # so `herd_can_expand()` can flip once the 2nd land buys land/animals.
+    if mouths and s["day"] <= 20:
+        wheat_tiles = max(6, mouths + 2)
+    else:
+        wheat_tiles = max(6, mouths) if mouths else 4
     cash_room = max(0, tiles - mouths - wheat_tiles)
     return tiles, cash_room, wheat_tiles
 
@@ -300,7 +305,11 @@ def berry_tile_cap(s: dict[str, Any]) -> int:
 
 
 def crop_plan(s: dict[str, Any]) -> dict[str, int]:
-    """How many tiles of each crop to hold. Shops first, leftover melons only."""
+    """How many tiles of each crop to hold.
+
+    Shops first. If no berry shop exists yet (Slice A), fill leftover tiles
+    with wheat instead of melon so wheat stays ahead of herd mouths.
+    """
     _, room, wheat_tiles = tile_budget(s)
     plan = {c: 0 for c in SEED_COST}
     plan["WHEAT"] = wheat_tiles
@@ -323,7 +332,22 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
     if demand.get("TOMATO", 0) >= 1 and s["day"] <= 24 and berry_sink(s) == 0:
         tomato_cap = 4 if s["n_quads"] == 1 else 8
         take("TOMATO", tomato_cap)
-    if leftover >= 8 and s["n_quads"] >= 3 and s["day"] <= 16 and live_ev(s, "MELON") > live_ev(s, "WHEAT"):
+
+    # Slice A wheat filler (no berries yet).
+    if berry_sink(s) == 0 and s["day"] <= 20 and leftover > 0:
+        # `take()` overwrites plan[crop], so add to the wheat floor directly.
+        plan["WHEAT"] += leftover
+        leftover = 0
+        return plan
+
+    # Melon filler only after berries exist.
+    if (
+        leftover >= 8
+        and s["n_quads"] >= 3
+        and s["day"] <= 16
+        and berry_sink(s) > 0
+        and live_ev(s, "MELON") > live_ev(s, "WHEAT")
+    ):
         take("MELON", min(8, leftover))
     return plan
 
@@ -346,7 +370,7 @@ def cash_caps(s: dict[str, Any]) -> tuple[int, int]:
 
 
 def want_cows(s: dict[str, Any]) -> int:
-    if s["day"] > 22 or milk_px(s) < 60:
+    if s["day"] > 20 or milk_px(s) < 80:
         return s["cows"]
     floor = 2 if s["day"] <= 20 else 0
     if s["cows"] < floor:
@@ -357,12 +381,11 @@ def want_cows(s: dict[str, Any]) -> int:
         return s["cows"]
     if not herd_can_expand(s):
         return s["cows"]
-    cap = 6 if s["n_quads"] == 2 else 8
-    return min(s["cows"] + 1, cap)
+    return min(s["cows"] + 1, 10)
 
 
 def want_sheep(s: dict[str, Any]) -> int:
-    if s["day"] > 22 or wool_px(s) < 80:
+    if s["day"] > 20 or wool_px(s) < 80:
         return s["sheep"]
     floor = 2 if s["day"] <= 20 else 0
     if s["sheep"] < floor:
@@ -373,8 +396,7 @@ def want_sheep(s: dict[str, Any]) -> int:
         return s["sheep"]
     if not herd_can_expand(s):
         return s["sheep"]
-    cap = 4 if s["n_quads"] == 2 else 6
-    return min(s["sheep"] + 1, cap)
+    return min(s["sheep"] + 1, 4)
 
 
 def want_geese(s: dict[str, Any]) -> int:
@@ -390,7 +412,7 @@ def want_geese(s: dict[str, Any]) -> int:
 
 
 def need_land(s: dict[str, Any]) -> bool:
-    if s["day"] < 4 or s["day"] >= 24 or s["n_quads"] >= 4:
+    if s["day"] < 6 or s["day"] >= 22 or s["n_quads"] >= 3:
         return False
     if s["n_quads"] == 1 and s["empty"] > 10:
         return False
@@ -406,27 +428,23 @@ def need_land(s: dict[str, Any]) -> bool:
             return True
         return False
     if s["n_quads"] == 2:
-        if int(s["money"]) < 3000:
+        if s["day"] < 11:
             return False
-        if s["empty"] <= 8:
-            return True
-        if berry_ok(s) and s["crops"]["STRAWBERRY"] >= 12 and s["empty"] <= 14:
-            return True
-        return False
-    if s["n_quads"] >= 3:
-        return s["empty"] <= 4 and s["day"] <= 18 and int(s["money"]) >= 5000
-    if s["empty"] <= 6:
+        if int(s["money"]) < 4000:
+            return False
+        if s["empty"] > 4:
+            return False
+        if berry_ok(s) and s["crops"]["STRAWBERRY"] < 16:
+            return False
         return True
-    bcap, ccap = cash_caps(s)
-    have = s["crops"]["STRAWBERRY"] + s["crops"]["CARROT"]
-    return (berry_ok(s) or carrot_ok(s)) and have >= max(4, bcap + ccap) and s["empty"] <= 10
+    return False
 
 
 def want_hands(s: dict[str, Any]) -> int:
     """Leaders rehire a full crew every morning. Day 0 stays the 5-hire opening."""
     if s["day"] == 0:
         return 5
-    if s["n_quads"] >= 2 or s["unwatered"] >= 8:
+    if s["n_quads"] >= 2 or mouths_of(s) >= 8:
         return 12
     if mouths_of(s) >= 1 or berry_ok(s):
         return 8
@@ -578,7 +596,10 @@ def cash_waiting(s: dict[str, Any], seeds: dict[str, int] | None = None) -> bool
 def wheat_waiting(s: dict[str, Any], seeds: dict[str, int] | None = None) -> bool:
     seeds = seeds if seeds is not None else s["seeds"]
     mouths = mouths_of(s)
-    floor = max(4, crop_plan(s)["WHEAT"]) if mouths > 0 else 0
+    # Slice A: `crop_plan(s)["WHEAT"]` may include filler wheat. We only
+    # want BUILD_PASTURE to wait for the `mouths + 2` wheat floor.
+    _, _, wheat_tiles = tile_budget(s)
+    floor = max(4, wheat_tiles) if mouths > 0 else 0
     if mouths > 0 and s["crops"]["WHEAT"] == 0 and seeds.get("WHEAT", 0) > 0:
         return True
     return seeds.get("WHEAT", 0) > 0 and s["crops"]["WHEAT"] < floor
@@ -951,6 +972,10 @@ def _buy_feed_wheat(market: list, afford: int, s: dict[str, Any]) -> int:
 
 def _buy_wheat_seeds(market: list, afford: int, s: dict[str, Any], seeds: dict[str, int]) -> int:
     _, _, wheat_tiles = tile_budget(s)
+    # Keep a small wheat seed buffer for late-game days so harvested wheat
+    # gets replanted before the next morning market decisions.
+    buffer = 2 if s["day"] >= 16 and mouths_of(s) > 0 else 0
+    wheat_tiles += buffer
     have_w = s["crops"]["WHEAT"] + seeds.get("WHEAT", 0)
     if have_w >= wheat_tiles:
         return afford
@@ -1035,7 +1060,9 @@ def _buy_planned_seeds(
 
 def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     below_floor = s["cows"] < 2 or s["sheep"] < 2
-    if s["day"] >= 24 and not below_floor:
+    if s["hour"] != 0 and not below_floor:
+        return afford
+    if s["day"] >= 20 and not below_floor:
         return afford
     if s["day"] < 3 and not below_floor:
         return afford
@@ -1048,7 +1075,7 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     if not below_floor and mouths_of(s) >= s["crops"]["WHEAT"]:
         return afford
     _, cash_room, _ = tile_budget(s)
-    mouth_cap = 6 if s["n_quads"] == 1 else (10 if s["n_quads"] == 2 else 12)
+    mouth_cap = 6 if s["n_quads"] == 1 else 14
     if mouths_of(s) >= mouth_cap:
         return afford
     if s["n_quads"] == 1 and cash_shop(s) and cash_room < 6 and not below_floor:
@@ -1057,7 +1084,8 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     reserve = min(900, seed_gap * SEED_COST["STRAWBERRY"])
     if below_floor:
         reserve = min(reserve, 200)
-    if afford - ANIMAL_COST["COW"] < max(reserve, 1200) and not below_floor:
+    cash_floor = 400 if s["n_quads"] >= 2 else 1200
+    if afford - ANIMAL_COST["COW"] < max(reserve, cash_floor) and not below_floor:
         return afford
     for kind, want, have in (
         ("COW", want_cows(s), s["cows"]),
@@ -1094,6 +1122,15 @@ def _keep_fert(s: dict[str, Any]) -> int:
     return 0
 
 
+def _sell_score(s: dict[str, Any], item: str, n: int) -> int:
+    price = px(s, item)
+    if item in ("STRAWBERRY", "MILK", "WOOL") and days_left(s["day"]) > 6:
+        hist = float(s.get("mean3", {}).get(item, price) or price)
+        if hist > 0 and price < hist * 0.82:
+            return 0
+    return n * price
+
+
 def _sell_goods(market: list, s: dict[str, Any], shed: dict, max_actions: int = 4) -> int:
     proceeds = 0
     keep_fert = _keep_fert(s)
@@ -1102,7 +1139,9 @@ def _sell_goods(market: list, s: dict[str, Any], shed: dict, max_actions: int = 
         keep = keep_fert if item == "FERTILIZER" else 0
         n = sell_qty(shed.get(item, 0), keep)
         if n > 0:
-            ranked.append((n * px(s, item), item, n))
+            score = _sell_score(s, item, n)
+            if score > 0:
+                ranked.append((score, item, n))
     ranked.sort(reverse=True)
     for _, item, n in ranked[:max_actions]:
         market.append(["SELL", item, n])
