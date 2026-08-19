@@ -78,9 +78,15 @@ class OpeningTests(unittest.TestCase):
         market = M.market_for(s, "ENGINE")
         self.assertFalse(any(a and a[0] == "BUY_LAND" for a in market))
 
-    def test_rest_of_day_zero_skips_market(self):
-        s = make_s(day=0, hour=7, money=2000)
-        self.assertEqual(M.market_for(s, "ENGINE"), [])
+    def test_rest_of_day_zero_is_idle(self):
+        s = make_s(
+            day=0,
+            hour=7,
+            money=2000,
+            shed={"FERTILIZER": 6, "WOOL": 4, "WHEAT": 0},
+        )
+        market = M.market_for(s, "ENGINE")
+        self.assertEqual(market, [])
 
 
 class FeedAndWheatTests(unittest.TestCase):
@@ -100,6 +106,21 @@ class FeedAndWheatTests(unittest.TestCase):
         market = []
         M._buy_feed_wheat(market, 2000, s)
         self.assertTrue(any(a[0] == "BUY_PRODUCT" and a[1] == "WHEAT" for a in market))
+
+    @unittest.skip("surplus wheat sell to bakery not in P1/P2 scope")
+    def test_bakery_sells_surplus_wheat(self):
+        s = make_s(
+            hour=5,
+            cows=2,
+            sheep=2,
+            shops=["BAKERY"],
+            shed={"WHEAT": 20, "FERTILIZER": 0, "MILK": 0, "WOOL": 0},
+        )
+        market: list = []
+        M._sell_goods(market, s, dict(s["shed"]), max_actions=4)
+        wheat_sells = [a for a in market if a[0] == "SELL" and a[1] == "WHEAT"]
+        self.assertTrue(wheat_sells)
+        self.assertGreater(wheat_sells[0][2], 0)
 
     def test_wheat_tiles_cover_mouths(self):
         s = make_s(cows=8, sheep=2, n_quads=2, shops=["PIZZA_SHOP"])
@@ -127,6 +148,33 @@ class FeedAndWheatTests(unittest.TestCase):
             prices={**M.BASE_PRICE, "MILK": 160},
         )
         self.assertEqual(M.want_cows(s), 2)
+
+    @unittest.skip("herd_can_expand not in P1/P2 scope")
+    def test_herd_blocked_without_wheat_buffer(self):
+        s = make_s(
+            n_quads=2,
+            cows=4,
+            sheep=2,
+            shops=["PIZZA_SHOP", "SMOOTHIE_SHOP"],
+            crops={"WHEAT": 5},
+            shed={"WHEAT": 1},
+        )
+        self.assertFalse(M.herd_can_expand(s))
+        self.assertEqual(M.want_cows(s), 4)
+
+    @unittest.skip("want_geese not in P1/P2 scope")
+    def test_bakery_wants_geese(self):
+        s = make_s(
+            n_quads=2,
+            day=8,
+            cows=2,
+            sheep=2,
+            geese=0,
+            crops={"WHEAT": 8},
+            shed={"WHEAT": 6},
+            shops=["BAKERY"],
+        )
+        self.assertGreaterEqual(M.want_geese(s), 1)
 
 
 class CropPlanTests(unittest.TestCase):
@@ -171,13 +219,166 @@ class CropPlanTests(unittest.TestCase):
         )
         self.assertEqual(M.pick_crop(s, dict(s["seeds"])), "WHEAT")
 
-    def test_no_tomatoes_when_berry_shop_exists(self):
+    def test_tomatoes_capped_when_berry_and_pizza_shops(self):
         s = make_s(n_quads=2, shops=["PIZZA_SHOP", "FARMERS_MARKET"])
-        self.assertEqual(M.crop_plan(s)["TOMATO"], 0)
+        plan = M.crop_plan(s)
+        self.assertLessEqual(plan["TOMATO"], 4)
+        self.assertGreaterEqual(plan["STRAWBERRY"], 16)
+
+    def test_no_filler_melon_after_berry_shop_opens(self):
+        s = make_s(
+            day=8,
+            n_quads=1,
+            cows=2,
+            sheep=2,
+            shops=["SMOOTHIE_SHOP"],
+            empty=10,
+            scores={**{c: 10.0 for c in M.SEED_COST}, "MELON": 40.0, "WHEAT": 8.0},
+        )
+        self.assertEqual(M.crop_plan(s)["MELON"], 0)
+
+    @unittest.skip("filler wheat/melon not in P1/P2 scope")
+    def test_pizza_only_still_allows_filler_before_berries(self):
+        s = make_s(
+            day=5,
+            n_quads=1,
+            cows=2,
+            sheep=2,
+            shops=["PIZZA_SHOP"],
+            empty=15,
+            scores={**{c: 10.0 for c in M.SEED_COST}, "MELON": 40.0, "WHEAT": 8.0},
+        )
+        plan = M.crop_plan(s)
+        self.assertGreater(plan["MELON"] + max(0, plan["WHEAT"] - 6), 0)
 
     def test_tomatoes_ok_on_pizza_without_berries(self):
         s = make_s(n_quads=1, shops=["PIZZA_SHOP"])
         self.assertGreater(M.crop_plan(s)["TOMATO"], 0)
+
+    @unittest.skip("filler wheat/melon not in P1/P2 scope")
+    def test_bakery_only_fills_leftover_tiles(self):
+        s = make_s(
+            day=5,
+            n_quads=1,
+            cows=2,
+            sheep=2,
+            shops=["BAKERY"],
+            empty=15,
+            scores={**{c: 10.0 for c in M.SEED_COST}, "MELON": 40.0, "WHEAT": 8.0},
+        )
+        plan = M.crop_plan(s)
+        self.assertEqual(plan["STRAWBERRY"], 0)
+        self.assertLessEqual(plan["MELON"], 4)
+        self.assertGreater(plan["WHEAT"], 6)
+        self.assertLess(plan["WHEAT"] + plan["MELON"], 21)
+
+    @unittest.skip("filler wheat/melon not in P1/P2 scope")
+    def test_two_quad_bakery_may_plant_melon_filler(self):
+        s = make_s(
+            day=5,
+            n_quads=2,
+            cows=2,
+            sheep=2,
+            shops=["BAKERY"],
+            empty=20,
+            scores={**{c: 10.0 for c in M.SEED_COST}, "MELON": 40.0, "WHEAT": 8.0},
+        )
+        self.assertGreater(M.crop_plan(s)["MELON"], 0)
+
+    @unittest.skip("filler wheat/melon not in P1/P2 scope")
+    def test_bakery_only_extra_wheat_when_melon_is_worse(self):
+        s = make_s(day=5, n_quads=1, cows=2, sheep=2, shops=["BAKERY"], empty=15)
+        plan = M.crop_plan(s)
+        self.assertEqual(plan["STRAWBERRY"], 0)
+        self.assertGreater(plan["WHEAT"], 6)
+
+    def test_berry_maps_still_prefer_strawberries_over_filler(self):
+        s = make_s(n_quads=2, shops=["FARMERS_MARKET"], cows=2, sheep=2)
+        plan = M.crop_plan(s)
+        self.assertGreaterEqual(plan["STRAWBERRY"], 16)
+        self.assertEqual(plan["MELON"], 0)
+        self.assertEqual(plan["WHEAT"], 6)
+
+    def test_pick_crop_plants_berries_before_extra_wheat(self):
+        s = make_s(
+            n_quads=2,
+            cows=2,
+            sheep=2,
+            shops=["FARMERS_MARKET"],
+            crops={"WHEAT": 6, "STRAWBERRY": 4},
+            seeds={"WHEAT": 8, "STRAWBERRY": 8},
+        )
+        self.assertEqual(M.pick_crop(s, dict(s["seeds"])), "STRAWBERRY")
+
+
+class SprintAndReplantTests(unittest.TestCase):
+    def test_plant_sprint_after_land_buy(self):
+        M._LAND_SPRINT["until_day"] = 10
+        s = make_s(day=9, n_quads=2, empty=14, shops=["FARMERS_MARKET"])
+        self.assertTrue(M.plant_sprint(s))
+        s2 = make_s(day=11, n_quads=2, empty=14, shops=["FARMERS_MARKET"])
+        self.assertFalse(M.plant_sprint(s2))
+
+    def test_plant_sprint_not_from_empty_tiles_alone(self):
+        s = make_s(
+            day=12,
+            n_quads=3,
+            empty=14,
+            shops=["FARMERS_MARKET"],
+            crops={"WHEAT": 6, "STRAWBERRY": 20},
+            seeds={"STRAWBERRY": 8},
+        )
+        self.assertFalse(M.plant_sprint(s))
+
+    def test_berry_replant_pick_after_plan_filled(self):
+        s = make_s(
+            day=18,
+            n_quads=2,
+            shops=["FARMERS_MARKET"],
+            crops={"WHEAT": 6, "STRAWBERRY": 20, "MELON": 0},
+            seeds={"STRAWBERRY": 4, "WHEAT": 4},
+        )
+        self.assertGreater(M.berry_gap(s), 0)
+        self.assertEqual(M.pick_crop(s, dict(s["seeds"])), "STRAWBERRY")
+
+    def test_land_prep_buys_berries_before_land(self):
+        s = make_s(
+            day=10,
+            hour=1,
+            n_quads=1,
+            empty=4,
+            money=4500,
+            workers=6,
+            hires_today=0,
+            shops=["FARMERS_MARKET"],
+            crops={"WHEAT": 6, "STRAWBERRY": 8},
+            seeds={"STRAWBERRY": 0},
+        )
+        market = M.market_for(s, "ENGINE")
+        land_i = next(i for i, a in enumerate(market) if a and a[0] == "BUY_LAND")
+        berry_before = any(
+            a and a[0] == "BUY_SEED" and a[1] == "STRAWBERRY" for a in market[:land_i]
+        )
+        self.assertTrue(berry_before, f"market order should seed berries before land: {market}")
+        hires_before = sum(1 for a in market[:land_i] if a and a[0] == "HIRE")
+        self.assertGreaterEqual(hires_before, 1)
+
+    def test_berry_push_blocks_animals_when_gap_large(self):
+        s = make_s(
+            day=18,
+            n_quads=2,
+            cows=4,
+            sheep=2,
+            money=5000,
+            shops=["FARMERS_MARKET"],
+            crops={"WHEAT": 8, "STRAWBERRY": 4},
+            seeds={"STRAWBERRY": 0},
+            shed={"COW": 0, "SHEEP": 0, "GOOSE": 0},
+        )
+        self.assertGreaterEqual(M.berry_gap(s), 6)
+        market: list = []
+        M._buy_animals(market, 5000, s)
+        self.assertFalse(any(a and a[0] == "BUY_ANIMAL" for a in market))
 
 
 class CrewTests(unittest.TestCase):
@@ -202,6 +403,76 @@ class LandGuardTests(unittest.TestCase):
     def test_no_land_when_one_quad_still_has_empty_tiles(self):
         s = make_s(day=8, n_quads=1, empty=18, money=4000, shops=["FARMERS_MARKET"])
         self.assertFalse(M.need_land(s))
+
+    @unittest.skip("8-berry land gate not in P1/P2 scope")
+    def test_no_land_until_first_berry_wave_is_in(self):
+        s = make_s(
+            day=8,
+            n_quads=1,
+            empty=4,
+            money=4000,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6, "STRAWBERRY": 2},
+        )
+        self.assertFalse(M.need_land(s))
+
+    def test_no_land_when_bank_cannot_cover_cost_reserve(self):
+        s = make_s(
+            day=8,
+            hour=5,
+            n_quads=1,
+            empty=4,
+            money=252,
+            cows=2,
+            sheep=2,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6, "STRAWBERRY": 8},
+        )
+        market = M.market_for(s, "ENGINE")
+        self.assertFalse(any(a and a[0] == "BUY_LAND" for a in market))
+
+    @unittest.skip("low-keep berry buys before day 12 not in P1/P2 scope")
+    def test_one_quad_buys_berries_when_cash_is_tight(self):
+        s = make_s(
+            day=6,
+            hour=1,
+            n_quads=1,
+            money=700,
+            cows=2,
+            sheep=2,
+            shops=["SMOOTHIE_SHOP"],
+            crops={"WHEAT": 6},
+            empty=15,
+        )
+        market = M.market_for(s, "ENGINE")
+        self.assertTrue(any(a and a[0] == "BUY_SEED" and a[1] == "STRAWBERRY" for a in market))
+
+    @unittest.skip("stricter 2-quad land gate not in P1/P2 scope")
+    def test_no_third_land_while_broke_on_late_berries(self):
+        s = make_s(
+            day=11,
+            n_quads=2,
+            money=3500,
+            empty=13,
+            cows=2,
+            sheep=2,
+            shops=["BRUNCH_SPOT"],
+            crops={"WHEAT": 6, "STRAWBERRY": 12},
+        )
+        self.assertFalse(M.need_land(s))
+
+    def test_third_land_ok_when_berries_filled_and_cash_healthy(self):
+        s = make_s(
+            day=14,
+            n_quads=2,
+            money=6000,
+            empty=5,
+            cows=2,
+            sheep=2,
+            shops=["BRUNCH_SPOT", "FARMERS_MARKET"],
+            crops={"WHEAT": 6, "STRAWBERRY": 24},
+        )
+        self.assertTrue(M.need_land(s))
 
 
 if __name__ == "__main__":

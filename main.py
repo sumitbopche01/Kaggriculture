@@ -104,6 +104,7 @@ def update_price_book(s: dict[str, Any]) -> None:
     global _PRICE_BOOK
     if s["day"] == 0 and s["hour"] == 0:
         _PRICE_BOOK = {"prev": {}, "delta": {}, "hist": {}}
+        _LAND_SPRINT["until_day"] = -1
     prices = {k: int(v) for k, v in s["prices"].items()}
     prev = _PRICE_BOOK.get("prev") or {}
     delta: dict[str, int] = {}
@@ -129,6 +130,53 @@ def milk_sink(s: dict[str, Any]) -> int:
 
 def berry_sink(s: dict[str, Any]) -> int:
     return sum(1 for shop in s.get("shops") or [] if shop in BERRY_SHOPS)
+
+
+_LAND_SPRINT: dict[str, int] = {"until_day": -1}
+
+
+def berry_gap(s: dict[str, Any]) -> int:
+    plan = crop_plan(s)
+    return max(
+        0,
+        plan.get("STRAWBERRY", 0)
+        - s["crops"].get("STRAWBERRY", 0)
+        - s["seeds"].get("STRAWBERRY", 0),
+    )
+
+
+def plant_sprint(s: dict[str, Any]) -> bool:
+    """Fill empty tiles aggressively for two days after buying land."""
+    if s["day"] > 22:
+        return False
+    return _LAND_SPRINT.get("until_day", -1) >= s["day"]
+
+
+def berry_replant_push(s: dict[str, Any]) -> bool:
+    return 12 <= s["day"] <= 26 and berry_ok(s) and berry_gap(s) > 0
+
+
+def land_bundle_cost(s: dict[str, Any]) -> int:
+    if s["n_quads"] >= 4:
+        return 0
+    return LAND_COST[s["n_quads"] - 1] + 800
+
+
+def _will_buy_land(s: dict[str, Any], afford: int) -> bool:
+    if not need_land(s) or s["n_quads"] >= 4:
+        return False
+    cost = LAND_COST[s["n_quads"] - 1]
+    if int(s["money"]) < land_bundle_cost(s):
+        return False
+    if afford < cost + 800:
+        return False
+    if s["n_quads"] >= 2 and afford - cost < 1500:
+        return False
+    if not cash_shop(s):
+        best_ev = max(s["scores"].values()) if s["scores"] else 0.0
+        if best_ev * 25 * max(3, days_left(s["day"]) // 2) < cost:
+            return False
+    return True
 
 
 def cash_shop(s: dict[str, Any]) -> bool:
@@ -501,6 +549,13 @@ def pick_crop(s: dict[str, Any], seeds: dict[str, int]) -> str | None:
         if "STRAWBERRY" in cash:
             return "STRAWBERRY"
         return max(cash, key=lambda c: s["scores"].get(c, 0.0))
+    if (
+        berry_ok(s)
+        and s["day"] <= 26
+        and seeds.get("STRAWBERRY", 0) > 0
+        and berry_gap(s) > 0
+    ):
+        return "STRAWBERRY"
     if s["crops"]["WHEAT"] < plan["WHEAT"] and seeds.get("WHEAT", 0) > 0:
         return "WHEAT"
     return None
@@ -564,13 +619,21 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                         and hungry == 0
                         and fert_ready == 0
                         and not ctx.get("skip_care")
+                        and not ctx.get("plant_sprint")
                     ):
                         priority = 3
                 elif ctx["carried"] and ANIMAL_STRUCT.get(ctx["carried"]) == t.get("kind"):
                     priority = 2
+            elif isinstance(t, dict) and t.get("kind") == "WEED":
+                if ctx.get("plant_sprint") and hungry == 0:
+                    priority = 0
+                    urgency = 8
             elif t is None:
                 waiting_plant = ctx.get("cash_waiting") or ctx.get("wheat_waiting")
-                if (ctx.get("need_pasture") or ctx.get("need_coop")) and not waiting_plant:
+                if ctx.get("plant_sprint") and hungry == 0 and has_seeds and waiting_plant:
+                    priority = 0
+                    urgency = 10
+                elif (ctx.get("need_pasture") or ctx.get("need_coop")) and not waiting_plant:
                     priority = 1
                 elif hungry == 0 and has_seeds:
                     priority = 1 if waiting_plant else 4
@@ -670,6 +733,7 @@ def action_for(tiles, x, y, day, seeds, claimed, s, inv, ctx):
                 not tile.get("cared_today")
                 and tile.get("fed_today")
                 and not ctx.get("skip_care")
+                and not ctx.get("plant_sprint")
             ):
                 claimed.add((x, y))
                 return ["CARE"], seeds
@@ -685,7 +749,13 @@ def action_for(tiles, x, y, day, seeds, claimed, s, inv, ctx):
     ):
         drop_items = tuple(i for i in DROP_ITEMS if i != "FERTILIZER")
     to_drop = any(inv.get(i, 0) > 0 for i in drop_items)
-    if to_drop and not is_feeder and s["at_risk"] == 0 and s["hungry"] == 0:
+    if (
+        to_drop
+        and not is_feeder
+        and s["at_risk"] == 0
+        and s["hungry"] == 0
+        and not ctx.get("plant_sprint")
+    ):
         if (x, y) in SHED_TILES:
             claimed.add((x, y))
             return ["DROP"], seeds
@@ -694,11 +764,25 @@ def action_for(tiles, x, y, day, seeds, claimed, s, inv, ctx):
     if tile is None:
         waiting_cash = ctx.get("cash_waiting")
         waiting_wheat = ctx.get("wheat_waiting")
-        if need_pasture and s["at_risk"] == 0 and not waiting_cash and not waiting_wheat:
+        sprint = ctx.get("plant_sprint")
+        struct_block = sprint and waiting_past <= 0 and waiting_coop <= 0
+        if (
+            need_pasture
+            and s["at_risk"] == 0
+            and not struct_block
+            and not waiting_cash
+            and not waiting_wheat
+        ):
             s["empty_struct"]["PASTURE"] += 1
             claimed.add((x, y))
             return ["BUILD_PASTURE"], seeds
-        if need_coop and s["at_risk"] == 0 and not waiting_cash and not waiting_wheat:
+        if (
+            need_coop
+            and s["at_risk"] == 0
+            and not struct_block
+            and not waiting_cash
+            and not waiting_wheat
+        ):
             s["empty_struct"]["COOP"] += 1
             claimed.add((x, y))
             return ["BUILD_COOP"], seeds
@@ -824,35 +908,50 @@ def _hire_up_to(market: list, afford: int, s: dict[str, Any]) -> int:
 
 
 def _maybe_buy_land(market: list, afford: int, s: dict[str, Any]) -> int:
-    if not need_land(s) or s["n_quads"] >= 4:
+    if not _will_buy_land(s, afford):
         return afford
     cost = LAND_COST[s["n_quads"] - 1]
-    if not cash_shop(s):
-        best_ev = max(s["scores"].values()) if s["scores"] else 0.0
-        if best_ev * 25 * max(3, days_left(s["day"]) // 2) < cost:
-            return afford
-    if afford < cost + 800:
-        return afford
-    if s["n_quads"] >= 2 and afford - cost < 1500:
-        return afford
     market.append(["BUY_LAND"])
+    _LAND_SPRINT["until_day"] = s["day"] + 2
     return afford - cost
 
 
-def _buy_planned_seeds(market: list, afford: int, s: dict[str, Any], seeds: dict[str, int]) -> int:
+def _buy_planned_seeds(
+    market: list,
+    afford: int,
+    s: dict[str, Any],
+    seeds: dict[str, int],
+    *,
+    berry_only: bool = False,
+) -> int:
     plan = crop_plan(s)
     cap_n = 8 if berry_sink(s) else 4
     if s["n_quads"] >= 2 and afford >= 1600:
         cap_n = 12
     if s["n_quads"] >= 3 and afford >= 2000:
         cap_n = 16
+    if berry_replant_push(s):
+        cap_n = max(cap_n, 16)
     order = [c for c in ("STRAWBERRY", "CARROT", "TOMATO", "MELON") if plan.get(c, 0) > 0]
+    if berry_only:
+        order = [c for c in order if c == "STRAWBERRY"]
     for crop in order:
         have = s["crops"][crop] + seeds.get(crop, 0)
         need = plan[crop] - have
-        keep = 400 if crop == "STRAWBERRY" and s["n_quads"] >= 2 else 800
+        if crop == "STRAWBERRY":
+            if berry_replant_push(s) or s["day"] >= 20:
+                keep = 80
+            else:
+                keep = 400 if s["n_quads"] >= 2 else 800
+            if berry_only:
+                need = max(need, min(12, max(6, berry_gap(s) + 4)))
+        else:
+            keep = 800
         if need > 0:
+            n_before = len(market)
             afford = _append_seed(market, afford, crop, min(need, cap_n), keep=keep)
+            if len(market) > n_before:
+                seeds[crop] = seeds.get(crop, 0) + int(market[-1][2])
     return afford
 
 
@@ -1003,8 +1102,14 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         afford = _hire_up_to(market, afford, s2)
         return _pack_market(market)
 
-    afford = _maybe_buy_land(market, afford, s2)
-    afford = _hire_up_to(market, afford, s2)
+    prep_land = _will_buy_land(s2, afford) and berry_ok(s2)
+    if prep_land:
+        afford = _hire_up_to(market, afford, s2)
+        afford = _buy_planned_seeds(market, afford, s2, s2["seeds"], berry_only=True)
+        afford = _maybe_buy_land(market, afford, s2)
+    else:
+        afford = _maybe_buy_land(market, afford, s2)
+        afford = _hire_up_to(market, afford, s2)
     afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
     afford = _buy_planned_seeds(market, afford, s2, s2["seeds"])
     if afford >= 1200:
@@ -1022,6 +1127,7 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
     claimed = set()
     n_feeders = min(s["workers"], s["hungry"]) if s["hungry"] else 0
     early_wheat = s["hungry"] > 0 and s["shed"].get("WHEAT", 0) == 0
+    sprint = plant_sprint(s)
     ctx = {
         "feeder": [max(1, n_feeders)],
         "is_feeder": False,
@@ -1032,6 +1138,7 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
         "carried": None,
         "has_wheat": False,
         "early_wheat": early_wheat,
+        "plant_sprint": sprint,
         "cash_seeds": (
             seeds.get("STRAWBERRY", 0) > 0
             or seeds.get("CARROT", 0) > 0

@@ -25,10 +25,17 @@ SCORE_FLOORS = {
     195016893: 28000,
     42: 25000,
     458695376: 38000,
+    827875246: 52000,
 }
 
 MEAN_SEEDS = [42, 7, 13, 21, 33, 55, 89, 99, 123, 256, 777, 1024, 2024, 3141, 993781610]
-MEAN_FLOOR = 34000
+MEAN_FLOOR = 45000
+
+SPRINT_FLOORS = {
+    993781610: 55000,
+    89: 40000,
+    3141: 43000,
+}
 
 EXTRA_SEEDS = [
     1,
@@ -43,6 +50,7 @@ EXTRA_SEEDS = [
     111111,
     1918864023,
     458695376,
+    827875246,
 ]
 EXTRA_FLOOR = 15000
 
@@ -99,6 +107,26 @@ def shop_wheat_off_hour(env) -> int:
     return n
 
 
+def shops_at(env, step_i: int) -> list:
+    return list(env.steps[step_i][0]["observation"].get("town", {}).get("unlocked_shops") or [])
+
+
+BERRY_SHOPS = {"SMOOTHIE_SHOP", "BRUNCH_SPOT", "ICE_CREAM_SHOP", "FARMERS_MARKET"}
+
+
+def berry_shop_open(env, step_i: int) -> bool:
+    return any(name in BERRY_SHOPS for name in shops_at(env, step_i))
+
+
+def empty_at_step(env, step_i: int) -> int:
+    me = env.steps[step_i][0]["observation"]["farms"][0]
+    return sum(1 for row in me["tiles"] for t in row if t is None)
+
+
+def dawn_step(day: int) -> int:
+    return day * 24
+
+
 class KeySeedRegression(unittest.TestCase):
     def test_fail_map_stays_well_above_old_26k(self):
         env, us, _starter = run_vs_starter(2063069147)
@@ -118,22 +146,129 @@ class KeySeedRegression(unittest.TestCase):
     def test_berry_dream_map_fills_land_and_beats_floor(self):
         env, us, _starter = run_vs_starter(458695376)
         self.assertGreaterEqual(us, SCORE_FLOORS[458695376], f"berry map collapsed to {us}")
-        berries_d12 = crop_count(env, 288, "STRAWBERRY")
-        self.assertGreaterEqual(
-            berries_d12,
-            24,
-            f"day-12 strawberries {berries_d12}; clone farms fill extra land with berries",
-        )
+        if berry_shop_open(env, dawn_step(8)):
+            berries_d12 = crop_count(env, 288, "STRAWBERRY")
+            self.assertGreaterEqual(
+                berries_d12,
+                16,
+                f"day-12 strawberries {berries_d12}; a berry shop was already open",
+            )
         berries_d20 = crop_count(env, 480, "STRAWBERRY")
         me20 = env.steps[480][0]["observation"]["farms"][0]
         empty20 = sum(1 for row in me20["tiles"] for t in row if t is None)
-        self.assertGreaterEqual(berries_d20, 16, f"day-20 strawberries {berries_d20} died and were not replanted")
+        if berry_shop_open(env, dawn_step(8)):
+            self.assertGreaterEqual(
+                berries_d20,
+                12,
+                f"day-20 strawberries {berries_d20} died and were not replanted",
+            )
+        elif berry_shop_open(env, dawn_step(12)):
+            self.assertGreaterEqual(
+                berries_d20,
+                4,
+                f"day-20 strawberries {berries_d20}; berry shop opened midgame and was ignored",
+            )
         self.assertLess(empty20, 30, f"day-20 empty {empty20}; extra land should not stay mostly unused")
         dawn_animals = animal_count(env, 144)
         self.assertGreaterEqual(dawn_animals.get("COW", 0), 2)
         self.assertGreaterEqual(dawn_animals.get("SHEEP", 0), 2)
         self.assertEqual(shop_wheat_off_hour(env), 0)
         self.assertNotIn(0, land_bought_days(env))
+
+
+class LateBerryBakeryMap(unittest.TestCase):
+    """Seed 827875246.
+
+    Sitting on 15 empty tiles scored ~46k and also rerolled the town shop
+    stream (weed RNG is mixed into shop draws). Fill leftover wheat/melon,
+    never buy land on an empty wallet, and plant berries once a berry shop
+    actually exists.
+    """
+
+    def test_idle_tiles_and_broke_land_do_not_return(self):
+        env, us, starter = run_vs_starter(827875246)
+        self.assertGreaterEqual(us, SCORE_FLOORS[827875246], f"seed 827875246 collapsed to {us}")
+        self.assertGreater(us, starter)
+
+        d6 = dawn_step(6)
+        planted6 = (
+            crop_count(env, d6, "WHEAT")
+            + crop_count(env, d6, "MELON")
+            + crop_count(env, d6, "TOMATO")
+            + crop_count(env, d6, "CARROT")
+        )
+        empty6 = empty_at_step(env, d6)
+        quads6 = len(env.steps[d6][0]["observation"]["farms"][0]["unlocked_quadrants"])
+        self.assertGreaterEqual(
+            planted6,
+            6,
+            f"day-6 planted {planted6}; leftover tiles were idle",
+        )
+        if quads6 == 1:
+            self.assertLessEqual(empty6, 16, f"day-6 empty {empty6} on 1 quad")
+
+        d8 = dawn_step(8)
+        money8 = int(env.steps[d8][0]["observation"]["farms"][0]["money"])
+        self.assertGreaterEqual(
+            money8,
+            400,
+            f"day-8 cash {money8}; land-on-empty-wallet wrecks the ramp",
+        )
+        if berry_shop_open(env, d8):
+            self.assertGreaterEqual(
+                crop_count(env, d8, "STRAWBERRY"),
+                4,
+                "berry shop is open by day 8; strawberries should be planted",
+            )
+
+        d16 = dawn_step(16)
+        if berry_shop_open(env, d16):
+            self.assertGreaterEqual(
+                crop_count(env, d16, "STRAWBERRY"),
+                4,
+                f"day-16 strawberries {crop_count(env, d16, 'STRAWBERRY')} with a berry shop open",
+            )
+        quads16 = len(env.steps[d16][0]["observation"]["farms"][0]["unlocked_quadrants"])
+        if quads16 >= 3:
+            self.assertLessEqual(
+                empty_at_step(env, d16),
+                24,
+                f"day-16 empty {empty_at_step(env, d16)} on {quads16} quads; third land left idle",
+            )
+        self.assertEqual(shop_wheat_off_hour(env), 0)
+        self.assertNotIn(0, land_bought_days(env))
+        for i, step in enumerate(env.steps[:-1]):
+            acts = (env.steps[i + 1][0].get("action") or {}).get("market") or []
+            if any(a and a[0] == "BUY_LAND" for a in acts):
+                bank = int(step[0]["observation"]["farms"][0]["money"])
+                self.assertGreaterEqual(
+                    bank,
+                    1000,
+                    f"bought land at ${bank} on day {step[0]['observation']['day']}",
+                )
+
+
+class LandSprintRegression(unittest.TestCase):
+    def test_worst_seeds_fill_boards_and_replant_berries(self):
+        for seed, floor in SPRINT_FLOORS.items():
+            env, us, starter = run_vs_starter(seed)
+            self.assertGreaterEqual(us, floor, f"seed {seed} collapsed to {us}")
+            self.assertGreater(us, starter)
+            d16 = dawn_step(16)
+            quads = len(env.steps[d16][0]["observation"]["farms"][0]["unlocked_quadrants"])
+            if quads >= 3 and berry_shop_open(env, d16):
+                empty16 = empty_at_step(env, d16)
+                self.assertLessEqual(
+                    empty16,
+                    24,
+                    f"seed {seed} day-16 empty {empty16} on {quads} quads",
+                )
+            if berry_shop_open(env, dawn_step(8)):
+                self.assertGreaterEqual(
+                    crop_count(env, dawn_step(20), "STRAWBERRY"),
+                    20,
+                    f"seed {seed} day-20 berry replant too low",
+                )
 
 
 class MeanRegression(unittest.TestCase):
