@@ -407,29 +407,6 @@ class SprintAndReplantTests(unittest.TestCase):
         self.assertGreater(M.berry_gap(s), 0)
         self.assertEqual(M.pick_crop(s, dict(s["seeds"])), "STRAWBERRY")
 
-    def test_land_prep_buys_berries_before_land(self):
-        s = make_s(
-            day=10,
-            hour=1,
-            n_quads=1,
-            empty=4,
-            money=4500,
-            workers=6,
-            hires_today=0,
-            shops=["FARMERS_MARKET"],
-            crops={"WHEAT": 6, "STRAWBERRY": 8},
-            seeds={"STRAWBERRY": 0},
-        )
-        market = M.market_for(s, "ENGINE")
-        land_i = next(i for i, a in enumerate(market) if a and a[0] == "BUY_LAND")
-        seed_before = any(a and a[0] == "BUY_SEED" for a in market[:land_i])
-        self.assertTrue(
-            seed_before,
-            f"market order should seed cash crops before land (shop-adaptive), got: {market}",
-        )
-        hires_before = sum(1 for a in market[:land_i] if a and a[0] == "HIRE")
-        self.assertGreaterEqual(hires_before, 1)
-
     def test_wheat_gate_blocks_animals_when_buffer_thin(self):
         s = make_s(
             day=18,

@@ -10,3 +10,4 @@ replay.json
 .env.*
 credentials.json
 kaggle.json
+.kaggle_cli
