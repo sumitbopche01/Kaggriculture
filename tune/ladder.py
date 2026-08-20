@@ -257,8 +257,9 @@ def main() -> None:
     p.add_argument("--seedCount", type=int, default=0, help="0 = all in seedSet")
     p.add_argument(
         "--opponents",
-        default="frozen_73k6,ecobot_v2",
+        default="frozen_73k6,ecobot_v2,structured,frontier_soil",
         help="Comma list. Fair defaults exclude replay/compressed bots. "
+        "structured + frontier_soil are strong public policies that beat us. "
         "Add deterministic for ceiling (0%% WR expected).",
     )
     p.add_argument(
