@@ -69,8 +69,55 @@ class TurnPlanTests(unittest.TestCase):
         s = make_s(day=27, shops=["FARMERS_MARKET"], crops={"WHEAT": 6})
         tp = M.plan_turn(s)
         self.assertEqual(tp.phase, "ENDGAME")
-        self.assertTrue(tp.harvest_focus)
+        self.assertFalse(tp.harvest_focus)
         self.assertTrue(tp.profile.skip_animal_care)
+
+    def test_endgame_still_fills_primary_gap(self):
+        M._SHOP_TRACK["first_berry_day"] = 3
+        M._SHOP_TRACK["first_milk_day"] = 3
+        try:
+            s = make_s(
+                day=27,
+                n_quads=2,
+                empty=12,
+                shops=["ICE_CREAM_SHOP"],
+                crops={"WHEAT": 6, "STRAWBERRY": 10},
+                seeds={"STRAWBERRY": 4},
+                scores={c: 10.0 for c in M.SEED_COST},
+                first_berry_day=3,
+                first_milk_day=3,
+            )
+            tp = M.plan_turn(s)
+            self.assertEqual(tp.phase, "ENDGAME")
+            self.assertTrue(tp.flags.field_short)
+            self.assertTrue(tp.fill_board)
+            self.assertEqual(M.pick_crop(s, dict(s["seeds"])), "STRAWBERRY")
+        finally:
+            M._SHOP_TRACK["first_berry_day"] = None
+            M._SHOP_TRACK["first_milk_day"] = None
+
+    def test_liquidate_stops_replant(self):
+        M._SHOP_TRACK["first_berry_day"] = 3
+        M._SHOP_TRACK["first_milk_day"] = 3
+        try:
+            s = make_s(
+                day=28,
+                n_quads=2,
+                empty=12,
+                shops=["ICE_CREAM_SHOP"],
+                crops={"WHEAT": 6, "STRAWBERRY": 10},
+                seeds={"STRAWBERRY": 4},
+                scores={c: 10.0 for c in M.SEED_COST},
+                first_berry_day=3,
+                first_milk_day=3,
+            )
+            tp = M.plan_turn(s)
+            self.assertEqual(tp.phase, "LIQUIDATE")
+            self.assertTrue(tp.harvest_focus)
+            self.assertFalse(tp.flags.field_short)
+        finally:
+            M._SHOP_TRACK["first_berry_day"] = None
+            M._SHOP_TRACK["first_milk_day"] = None
 
     def test_late_sprint_market_route(self):
         M._LATE_SHOP_SPRINT["until_day"] = 20

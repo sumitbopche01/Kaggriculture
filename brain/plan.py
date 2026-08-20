@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from brain.map import MapStrategy, strategy_defer_animals, strategy_spike_sell_bump
+from brain.turn_budget import TurnBudget
 
 Phase = Literal["ENGINE", "SPIKE", "LATE_RAMP", "ENDGAME", "LIQUIDATE"]
 Mode = Literal["ENGINE", "LIQUIDATE"]
@@ -50,6 +51,8 @@ class TurnFlags:
     late_ongoing: bool
     demand_stack: bool
     price_spike: dict[str, bool]
+    cash_ramp: bool = False
+    field_short: bool = False
 
 
 @dataclass
@@ -67,6 +70,9 @@ class TurnPlan:
     defer_animals: bool
     strategy: MapStrategy = "UNKNOWN"
     regime: dict[str, Any] = field(default_factory=dict)
+    cash_crop: str = ""
+    cash_gap: int = 0
+    budget: TurnBudget | None = None
 
     @property
     def fill_board(self) -> bool:
@@ -74,6 +80,9 @@ class TurnPlan:
         return (
             self.flags.plant_sprint
             or self.flags.berry_ramp
+            or self.flags.cash_ramp
+            or self.flags.berry_replant_push
+            or self.flags.field_short
             or self.flags.board_fill_pressure
         )
 
@@ -126,7 +135,7 @@ def phase_profile(phase: Phase, params: dict[str, int | float]) -> PhaseProfile:
             land_cash_buffer=land_default,
             post_land_floor=post_default,
             skip_animal_care=True,
-            field_priority="harvest",
+            field_priority="fill",
         )
     if phase == "LATE_RAMP":
         return PhaseProfile(
@@ -180,7 +189,6 @@ def classify_phase(
     *,
     late_shop_sprint: bool,
     price_spike_any: bool,
-    demand_stack: bool,
     days_left: int,
 ) -> Phase:
     if s["day"] >= int(params["liquidate_day_min"]):
@@ -189,7 +197,7 @@ def classify_phase(
         return "ENDGAME"
     if late_shop_sprint:
         return "LATE_RAMP"
-    if price_spike_any or demand_stack:
+    if price_spike_any:
         return "SPIKE"
     return "ENGINE"
 
@@ -236,7 +244,11 @@ def compute_sell_n(
     prof = plan.profile
     if mode == "LIQUIDATE":
         sell_n = prof.sell_n_liquidate
-    elif (plan.flags.berry_ok and plan.berry_gap > 0) or plan.flags.need_land:
+    elif (
+        (plan.flags.berry_ok and plan.berry_gap > 0)
+        or plan.cash_gap > 0
+        or plan.flags.need_land
+    ):
         sell_n = prof.sell_n_build
     else:
         sell_n = prof.sell_n_base
@@ -322,7 +334,6 @@ def build_turn_plan(
         params,
         late_shop_sprint=flags.late_shop_sprint,
         price_spike_any=price_spike_any,
-        demand_stack=flags.demand_stack,
         days_left=days_left,
     )
     mode: Mode = "LIQUIDATE" if phase == "LIQUIDATE" else "ENGINE"

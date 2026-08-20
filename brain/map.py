@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from brain.playbook import engine_of
+
 MapStrategy = Literal["UNKNOWN", "EARLY_BERRY", "LATE_BERRY", "MILK_STACK", "LAND_SPRINT"]
 
 EGG_SHOPS = frozenset({"BAKERY", "BRUNCH_SPOT"})
@@ -130,7 +132,8 @@ def maybe_reclassify_archetype(
 
 
 def strategy_allows_berry_prep(strategy: MapStrategy) -> bool:
-    return strategy in ("LATE_BERRY", "LAND_SPRINT", "MILK_STACK", "UNKNOWN")
+    # MILK_STACK is a pizza/milk town — prep strawberries there starves cows.
+    return strategy in ("LATE_BERRY", "LAND_SPRINT", "UNKNOWN")
 
 
 def strategy_land_ramp_relax_trigger_cap(
@@ -233,9 +236,14 @@ def strategy_defer_animals(
     )
     if not base:
         return False
+    milk_sink = int(s.get("milk_sink", 0) or 0)
+    n_quads = int(s.get("n_quads", 1) or 1)
+    # Pizza-first (MILK engine) still buys cows even if FM locked EARLY_BERRY.
+    # Ice-cream-first stays BERRY and defers animals for planting.
+    if engine_of(s) == "MILK" and milk_sink >= 1 and n_quads >= 2:
+        return False
     if strategy != "MILK_STACK":
         return True
-    milk_sink = int(s.get("milk_sink", 0) or 0)
     milk_min = int(params.get("map_milk_defer_milk_sink_min", 2))
     empty_max = int(params.get("map_milk_defer_empty_max", 14))
     if milk_sink >= milk_min and empty < empty_max:

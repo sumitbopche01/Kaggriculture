@@ -205,8 +205,8 @@ class ReclassifyTests(unittest.TestCase):
 
 
 class StrategyHelperTests(unittest.TestCase):
-    def test_milk_stack_allows_berry_prep(self):
-        self.assertTrue(strategy_allows_berry_prep("MILK_STACK"))
+    def test_milk_stack_skips_berry_prep(self):
+        self.assertFalse(strategy_allows_berry_prep("MILK_STACK"))
 
     def test_early_berry_blocks_spike_sell_with_berry_sink(self):
         s = {"day": 8, "berry_sink": 2}
@@ -277,12 +277,46 @@ class StrategyHelperTests(unittest.TestCase):
 
     def test_milk_stack_defers_animals_less(self):
         flags = _flags(late_shop_sprint=True)
-        s = {"day": 10, "empty": 10, "milk_sink": 2}
+        s = {"day": 10, "empty": 10, "milk_sink": 2, "n_quads": 2}
         self.assertFalse(
-            strategy_defer_animals("MILK_STACK", s, flags, berry_gap=4, params=PARAMS)
+            strategy_defer_animals(
+                "MILK_STACK", {**s, "engine": "MILK"}, flags, berry_gap=4, params=PARAMS
+            )
         )
         self.assertTrue(
-            strategy_defer_animals("LAND_SPRINT", s, flags, berry_gap=4, params=PARAMS)
+            strategy_defer_animals(
+                "LAND_SPRINT", {**s, "engine": "BERRY"}, flags, berry_gap=4, params=PARAMS
+            )
+        )
+
+    def test_early_berry_milk_engine_does_not_defer_on_2q(self):
+        flags = _flags(late_shop_sprint=True)
+        s = {
+            "day": 10,
+            "empty": 14,
+            "milk_sink": 1,
+            "n_quads": 2,
+            "engine": "MILK",
+            "first_milk_day": 3,
+            "first_berry_day": 6,
+        }
+        self.assertFalse(
+            strategy_defer_animals("EARLY_BERRY", s, flags, berry_gap=4, params=PARAMS)
+        )
+
+    def test_early_berry_engine_still_defers_on_2q(self):
+        flags = _flags(late_shop_sprint=True)
+        s = {
+            "day": 10,
+            "empty": 14,
+            "milk_sink": 2,
+            "n_quads": 2,
+            "engine": "BERRY",
+            "first_berry_day": 3,
+            "first_milk_day": 3,
+        }
+        self.assertTrue(
+            strategy_defer_animals("EARLY_BERRY", s, flags, berry_gap=4, params=PARAMS)
         )
 
 

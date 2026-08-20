@@ -30,6 +30,31 @@ from brain.map import (
     strategy_land_empty_cap,
     strategy_quad1_empty_cap,
 )
+from brain.playbook import (
+    ENGINE_REPLANT_DAY_MAX,
+    cash_tile_cap,
+    cow_target,
+    crop_gap,
+    crop_is_ramping,
+    crop_is_replanting,
+    engine_of,
+    herd_tile_reserve,
+    map_engine,
+    plant_gap,
+    primary_cash_crop,
+    skip_berry_prep_for_sinks,
+)
+from brain.turn_budget import (
+    TurnBudget,
+    choose_project,
+    compute_turn_budget,
+    cow_beats_seeds,
+    cow_project_ev,
+    land_expansion_npv,
+    post_land_seed_cap,
+    seed_project_ev,
+    skip_days_after_land,
+)
 
 HARVEST_AGE = {"WHEAT": 4, "CARROT": 3, "MELON": 10}
 YIELD_CAP = {"WHEAT": 4, "CARROT": 3, "MELON": 6}
@@ -91,7 +116,7 @@ OPENING_MARKET = [
 
 DEFAULT_PARAMS: dict[str, int | float] = {
     # Slice A wheat engine
-    "wheat_engine_day_max": 20,
+    "wheat_engine_day_max": 24,
     "wheat_buffer_add": 2,
     "wheat_min_tiles": 6,
     "wheat_no_mouth_tiles": 4,
@@ -103,11 +128,12 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "melon_n_quads_min": 3,
     "melon_day_max": 16,
     # Herd ramp gates
-    "cow_day_max": 20,
+    "cow_day_max": 24,
     "cow_milk_px_min": 80,
     "cow_floor_day_max": 20,
     "cow_floor": 2,
     "cow_expand_cap": 10,
+    "cow_stack_cap": 12,
     "sheep_day_max": 20,
     "sheep_wool_px_min": 80,
     "sheep_floor_day_max": 20,
@@ -182,9 +208,11 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "demand_cap_step_berry": 4,
     "demand_cap_step_crop": 2,
     "milk_herd_base": 2,
+    "berry_milk_cow_cap": 6,
     "wool_herd_base": 2,
     # P2: phase system + late shop sprint + extended windows
     "liquidate_day_min": 28,
+    "engine_replant_day_max": ENGINE_REPLANT_DAY_MAX,
     "liquidity_rescue_day_max": 26,
     "seed_fill_day_max": 22,
     "endgame_days_left": 4,
@@ -195,7 +223,7 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "late_ramp_hire_cap": 3,
     "late_ramp_land_cash_buffer": 400,
     "late_ramp_skip_strawberry_min": 1,
-    # P3: predictive berry prep before a late first berry shop
+    # P3/P7: stockpile and plant strawberries before a late first berry shop.
     "berry_prep_enabled": 1,
     "berry_prep_day_min": 11,
     "berry_prep_day_max": 14,
@@ -210,7 +238,7 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "frontrun_uptrend_hours": 3,
     "frontrun_score_mult": 1.2,
     "frontrun_cap_bonus": 4,
-    "animal_buy_day_max": 20,
+    "animal_buy_day_max": 24,
     "animal_buy_day_min": 3,
     "mouth_cap_1q": 6,
     "mouth_cap_2qplus": 14,
@@ -342,6 +370,22 @@ def plan_viable(s: dict[str, Any], crop: str) -> bool:
     return True
 
 
+def _hold_engine_crop(s: dict[str, Any], crop: str) -> bool:
+    """Keep the opener's tile plan after new-plant EV hits zero.
+
+    `ongoing_crop_score` requires a 2.5× spike once days_left < 8. That is a
+    gate for *new* plantings, not a reason to drop a live strawberry field.
+    """
+    if not engine_replant_open(s):
+        return False
+    if int((s.get("demand") or {}).get(crop, 0) or 0) < 1:
+        return False
+    glut_level = glut(s, crop)
+    if glut_level > float(PARAMS["glut_block_threshold"]) and not price_spike(s, crop):
+        return False
+    return _primary_cash(s) == crop
+
+
 def update_uptrend_tracking(s: dict[str, Any]) -> None:
     """Count consecutive uptrend hours for high-demand crops."""
     global _UPTREND_HOURS
@@ -395,6 +439,9 @@ def update_shop_tracking(s: dict[str, Any]) -> None:
     new_berry = [sh for sh in shops if sh in BERRY_SHOPS and sh not in prev]
     if new_berry and _SHOP_TRACK.get("first_berry_day") is None:
         _SHOP_TRACK["first_berry_day"] = s["day"]
+    new_milk = [sh for sh in shops if sh in MILK_SHOPS and sh not in prev]
+    if new_milk and _SHOP_TRACK.get("first_milk_day") is None:
+        _SHOP_TRACK["first_milk_day"] = s["day"]
     first_late_berry = new_berry and not (prev & set(BERRY_SHOPS))
     if first_late_berry and s["day"] >= int(PARAMS["late_shop_day_min"]):
         until = s["day"] + int(PARAMS["late_shop_sprint_days"])
@@ -506,21 +553,23 @@ def _cash_deficit(s: dict[str, Any]) -> float:
     return max(0.0, planned_seed_spend - float(s.get("money", 0)))
 
 
-def berry_prep_active(s: dict[str, Any]) -> bool:
-    """Reserve land/cash for strawberries when no berry shop is open yet."""
+def _berry_prep_window(s: dict[str, Any]) -> bool:
+    """Day/shop/land gates for berry steering. Does not read crop_plan."""
     if int(PARAMS["berry_prep_enabled"]) != 1:
         return False
     strat = map_strategy(s)
     if strat != "UNKNOWN" and not strategy_allows_berry_prep(strat):
         return False
-    if berry_sink(s) > 0:
+    if berry_sink(s) > 0 or skip_berry_prep_for_sinks(
+        s,
+        first_berry_day=_SHOP_TRACK.get("first_berry_day"),
+        first_milk_day=_SHOP_TRACK.get("first_milk_day"),
+    ):
         return False
     day = s["day"]
     if day < int(PARAMS["berry_prep_day_min"]) or day > int(PARAMS["berry_prep_day_max"]):
         return False
     if float(s.get("money", 0)) < float(PARAMS["berry_prep_money_min"]):
-        return False
-    if _cash_deficit(s) >= 900:
         return False
     if int(s["empty"]) < int(PARAMS["berry_prep_empty_min"]):
         return False
@@ -528,7 +577,14 @@ def berry_prep_active(s: dict[str, Any]) -> bool:
         return False
     if s["n_quads"] == 1 and int(s["empty"]) > 8:
         return False
-    if s["n_quads"] == 1 and s["empty"] > 12:
+    return True
+
+
+def berry_prep_active(s: dict[str, Any]) -> bool:
+    """Reserve land/cash for strawberries when no berry shop is open yet."""
+    if not _berry_prep_window(s):
+        return False
+    if _cash_deficit(s) >= 900:
         return False
     return True
 
@@ -570,13 +626,22 @@ def plant_sprint(s: dict[str, Any]) -> bool:
     return _LAND_SPRINT.get("until_day", -1) >= s["day"]
 
 
+def engine_replant_open(s: dict[str, Any]) -> bool:
+    """Plant the engine crop through ENDGAME; stop on LIQUIDATE."""
+    return int(s.get("day", 0)) <= int(PARAMS["engine_replant_day_max"])
+
+
 def berry_replant_push(s: dict[str, Any]) -> bool:
     tp = s.get("turn_plan")
     if tp is not None:
         return tp.flags.berry_replant_push
-    if in_late_ramp(s) and berry_ok(s) and berry_gap(s) > 0:
-        return s["day"] <= int(PARAMS["late_shop_sprint_cutoff_day"])
-    return 12 <= s["day"] <= 26 and berry_ok(s) and berry_gap(s) > 0
+    if not engine_replant_open(s):
+        return False
+    if not (berry_ok(s) and berry_gap(s) > 0):
+        return False
+    if in_late_ramp(s):
+        return True
+    return s["day"] >= 12
 
 
 def seed_fill_push(s: dict[str, Any]) -> bool:
@@ -605,21 +670,21 @@ def berry_ramp(s: dict[str, Any]) -> bool:
     if tp is not None:
         return tp.flags.berry_ramp
     late = in_late_ramp(s)
-    day_max = 18 if late else 16
-    gap_need = 2 if late else 3
-    if not berry_ok(s) or s["day"] < 7 or s["day"] > day_max:
-        return False
-    if s["empty"] < 2:
-        return False
-    target = crop_plan(s).get("STRAWBERRY", 0)
-    if target <= 0:
-        return False
-    have = s["crops"].get("STRAWBERRY", 0) + s["seeds"].get("STRAWBERRY", 0)
-    if have >= target:
-        return False
-    if s["n_quads"] == 1 and have >= 8 and not late:
-        return False
-    return berry_gap(s) >= gap_need
+    plan = crop_plan(s)
+    return crop_is_ramping(s, "STRAWBERRY", plan, late=late)
+
+
+def cash_ramp(s: dict[str, Any]) -> bool:
+    """Ramp the dominant shop crop (berries, tomatoes, or carrots)."""
+    tp = s.get("turn_plan")
+    if tp is not None:
+        return tp.flags.cash_ramp
+    late = in_late_ramp(s)
+    plan = crop_plan(s)
+    primary = _primary_cash(s)
+    if primary == "STRAWBERRY":
+        return crop_is_ramping(s, "STRAWBERRY", plan, late=late)
+    return crop_is_ramping(s, primary, plan, late=late)
 
 
 def berry_seed_push(s: dict[str, Any]) -> bool:
@@ -630,6 +695,18 @@ def land_bundle_cost(s: dict[str, Any]) -> int:
     if s["n_quads"] >= 4:
         return 0
     return LAND_COST[s["n_quads"] - 1] + 800
+
+
+def _turn_budget(s: dict[str, Any]) -> TurnBudget:
+    tp = s.get("turn_plan")
+    if tp is not None and tp.budget is not None:
+        return tp.budget
+    primary = _primary_cash(s)
+    tile_ev = plan_ev(s, primary) if primary else 0.0
+    days = max(0, int(PARAMS["engine_replant_day_max"]) - int(s["day"]))
+    return compute_turn_budget(
+        s, cash_crop=primary or "", tile_ev=tile_ev, productive_days=days
+    )
 
 
 def _will_buy_land(s: dict[str, Any], afford: int) -> bool:
@@ -670,6 +747,35 @@ def _will_buy_land(s: dict[str, Any], afford: int) -> bool:
         best_ev = max((plan_ev(s, c) for c in s["scores"]), default=0.0)
         if best_ev * 25 * max(3, days_left(s["day"]) // 2) < cost:
             return False
+    # Plot 3+: NPV of dawn-capacity tiles after watering the live field.
+    # Evening packed boards have hour-plantable≈crew but day_plantable≈0.
+    if s["n_quads"] >= 2:
+        primary = _primary_cash(s)
+        budget = _turn_budget(s)
+        plantable_new = min(25, budget.day_plantable)
+        seed_c = int(SEED_COST.get(primary or "WHEAT", 10))
+        skip = skip_days_after_land(
+            live_tiles=budget.live_tiles,
+            extra_empty=25,
+            workers=budget.workers,
+        )
+        npv = land_expansion_npv(
+            plantable_new=plantable_new,
+            tile_ev=budget.tile_ev,
+            productive_days=budget.productive_days,
+            land_cost=cost,
+            seed_cost=seed_c,
+            live_tiles=budget.live_tiles,
+            skip_days=skip,
+        )
+        if npv <= 0 or plantable_new <= 0:
+            return False
+        fill_cost = plantable_new * seed_c
+        # Keep enough cash to hire/feed the live field tomorrow — not a
+        # full day of tile EV (that blocked healthy expansions).
+        live_ops = max(int(post_land_floor), int(budget.live_tiles) * 10)
+        if afford < cost + fill_cost + live_ops:
+            return False
     return True
 
 
@@ -690,7 +796,14 @@ def herd_can_expand(s: dict[str, Any]) -> bool:
     mouths = mouths_of(s)
     if mouths <= 0:
         return True
-    if s["crops"].get("WHEAT", 0) < mouths + 1:
+    # Berry garnish cows: planted mouths is enough if seed+shed cover the buffer.
+    # Packed ice-cream boards kept W=5 while need was mouths+2 and never bought.
+    if engine_of(s) == "BERRY":
+        if int(s["crops"].get("WHEAT", 0) or 0) < mouths:
+            return False
+        return wheat_stock(s) >= mouths + int(PARAMS["wheat_buffer_add"])
+    need = mouths + (2 if milk_sink(s) >= 1 else 1)
+    if s["crops"].get("WHEAT", 0) < need:
         return False
     if wheat_stock(s) < mouths + 2:
         return False
@@ -810,12 +923,36 @@ def live_ev(s: dict[str, Any], crop: str) -> float:
     return ev
 
 
+def current_engine(s: dict[str, Any]) -> str:
+    """BERRY / MILK / EGG — gates milk-only wheat, cow, and market rules."""
+    if s.get("first_berry_day") is None:
+        s["first_berry_day"] = _SHOP_TRACK.get("first_berry_day")
+    if s.get("first_milk_day") is None:
+        s["first_milk_day"] = _SHOP_TRACK.get("first_milk_day")
+    s["engine"] = map_engine(
+        milk_n=milk_sink(s),
+        egg_n=egg_sink(s),
+        first_berry_day=s.get("first_berry_day"),
+        first_milk_day=s.get("first_milk_day"),
+    )
+    return s["engine"]
+
+
 def tile_budget(s: dict[str, Any]) -> tuple[int, int, int]:
     tiles = s["n_quads"] * 25
     mouths = mouths_of(s)
-    # Slice A: keep wheat ahead of mouths (`mouths + 2`) early on
-    # so `herd_can_expand()` can flip once the 2nd land buys land/animals.
-    if mouths and s["day"] <= PARAMS["wheat_engine_day_max"]:
+    # Two bakeries also list WHEAT. Only a milk engine should keep feed
+    # tiles ahead of mouths after wheat_engine_day_max (pizza starve fix).
+    shop_wheat = (
+        int((s.get("demand") or {}).get("WHEAT", 0) or 0) >= 2
+        and current_engine(s) == "MILK"
+    )
+    keep_ahead = mouths and (
+        s["day"] <= PARAMS["wheat_engine_day_max"] or shop_wheat
+    )
+    # Pizza/ice cream list WHEAT as a product; keep feed tiles ahead of mouths
+    # or the extra cows starve (761083594: 6 cows → 2).
+    if keep_ahead:
         wheat_tiles = max(
             PARAMS["wheat_min_tiles"], mouths + PARAMS["wheat_buffer_add"]
         )
@@ -825,30 +962,45 @@ def tile_budget(s: dict[str, Any]) -> tuple[int, int, int]:
             if mouths
             else PARAMS["wheat_no_mouth_tiles"]
         )
+    # Berry ice-cream garnish still needs a feed floor even when leftover
+    # strawberries own the cash room.
+    if mouths and current_engine(s) == "BERRY":
+        wheat_tiles = max(
+            int(wheat_tiles), mouths + int(PARAMS["wheat_buffer_add"])
+        )
     cash_room = max(0, tiles - mouths - wheat_tiles)
     return tiles, cash_room, wheat_tiles
 
 
 def berry_tile_cap(s: dict[str, Any]) -> int:
     """Strawberries scale with land and stacked berry-shop demand."""
-    if s["n_quads"] <= 1:
-        base = 8
-    elif s["n_quads"] == 2:
-        base = 28
-    elif s["n_quads"] == 3:
-        base = 48
-    else:
-        base = 60
     berry_d = int((s.get("demand") or {}).get("STRAWBERRY", 0))
     step = int(PARAMS["demand_cap_step_berry"])
-    return demand_scaled_cap(base, berry_d, step=step)
+    return cash_tile_cap(
+        int(s["n_quads"]), berry_d, primary=True, step=step, crop="STRAWBERRY"
+    )
+
+
+def _primary_cash(s: dict[str, Any]) -> str | None:
+    return primary_cash_crop(
+        s.get("demand"),
+        viable={
+            "STRAWBERRY": plan_viable(s, "STRAWBERRY"),
+            "TOMATO": plan_viable(s, "TOMATO"),
+            "CARROT": plan_viable(s, "CARROT"),
+        },
+        milk_n=milk_sink(s),
+        first_berry_day=_SHOP_TRACK.get("first_berry_day"),
+        first_milk_day=_SHOP_TRACK.get("first_milk_day"),
+    )
 
 
 def crop_plan(s: dict[str, Any]) -> dict[str, int]:
     """How many tiles of each crop to hold.
 
-    Allocate cash tiles to the most profitable cash crops available from the
-    currently open shops (and melon as an EV-based fallback).
+    Fill the engine cash crop to its cap. Leftover tiles become wheat on
+    milk/egg maps (feed). They do not go to carrot/tomato EV — that is
+    how farmers market leftover turned a berry town into a carrot field.
     """
     tp = s.get("turn_plan")
     if tp is not None:
@@ -856,14 +1008,9 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
     _, room, wheat_tiles = tile_budget(s)
     plan = {c: 0 for c in SEED_COST}
     plan["WHEAT"] = wheat_tiles
-    leftover = room
-    cap_bonus = min(int(PARAMS["cap_override_bonus_max"]), room)
+    leftover = max(0, room - herd_tile_reserve(s, PARAMS))
+    cap_bonus = min(int(PARAMS["cap_override_bonus_max"]), leftover)
     demand = s.get("demand") or {}
-    # Early-game melon is a small EV cash-cycle starter while there is
-    # no STRAWBERRY demand yet. (Using `demand` avoids mismatches where
-    # some berry shops contribute to strawberry demand but aren't counted
-    # by `berry_sink`.)
-    melon_early = demand.get("STRAWBERRY", 0) == 0 and s["day"] <= 6
 
     def take(crop: str, cap: int) -> None:
         nonlocal leftover
@@ -874,45 +1021,31 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
         leftover -= n
 
     candidates: list[str] = []
-    if demand.get("STRAWBERRY", 0) >= 1 and plan_viable(s, "STRAWBERRY"):
+    if demand.get("STRAWBERRY", 0) >= 1 and (
+        plan_viable(s, "STRAWBERRY") or _hold_engine_crop(s, "STRAWBERRY")
+    ):
         candidates.append("STRAWBERRY")
     if demand.get("CARROT", 0) >= 1 and plan_viable(s, "CARROT"):
         candidates.append("CARROT")
-    if demand.get("TOMATO", 0) >= 1 and plan_viable(s, "TOMATO"):
-        candidates.append("TOMATO")
-    if (
-        leftover >= PARAMS["melon_leftover_min"]
-        and (s["n_quads"] >= PARAMS["melon_n_quads_min"] or melon_early)
-        and s["day"] <= PARAMS["melon_day_max"]
-        and plan_viable(s, "MELON")
-        and plan_ev(s, "MELON") > plan_ev(s, "WHEAT")
+    if demand.get("TOMATO", 0) >= 1 and (
+        plan_viable(s, "TOMATO") or _hold_engine_crop(s, "TOMATO")
     ):
-        candidates.append("MELON")
+        candidates.append("TOMATO")
 
-    # EV-driven allocator: increment one cash tile at a time, choosing the
-    # crop with best EV per seed-cost. This replaces fixed per-crop caps.
-    def tile_marginal_score(crop: str) -> float:
-        ev = plan_ev(s, crop)
-        cost = float(SEED_COST.get(crop, 1))
-        return ev / max(1.0, cost)
-
-    # Keep allocation stable by using the candidate set as the search space.
-    # (We already gated candidates with crop_score > 0.)
     cap_step = int(PARAMS["demand_cap_step_crop"])
+    berry_step = int(PARAMS["demand_cap_step_berry"])
+    primary = _primary_cash(s)
     cap_map: dict[str, int] = {}
     for c in candidates:
-        if c == "STRAWBERRY":
-            cap_map[c] = berry_tile_cap(s)
-        elif c == "CARROT":
-            base = 4 if s["n_quads"] == 1 else 8
-            cap_map[c] = demand_scaled_cap(base, demand.get("CARROT", 0), step=cap_step)
-        elif c == "TOMATO":
-            base = 4 if s["n_quads"] == 1 else 8
-            cap_map[c] = demand_scaled_cap(base, demand.get("TOMATO", 0), step=cap_step)
-        elif c == "MELON":
-            cap_map[c] = min(3 if melon_early else 8, leftover)
-        else:
-            cap_map[c] = 0
+        is_primary = c == primary
+        step = berry_step if c == "STRAWBERRY" else cap_step
+        cap_map[c] = cash_tile_cap(
+            int(s["n_quads"]),
+            int(demand.get(c, 0)),
+            primary=is_primary,
+            step=step,
+            crop=c,
+        )
 
     med_ev = _median_plan_ev(s, candidates)
     override_mult = float(PARAMS["cap_override_ev_mult"])
@@ -926,24 +1059,49 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
             if plan_ev(s, c) > override_mult * med_ev:
                 cap_map[c] = cap_map.get(c, 0) + cap_bonus
 
-    while leftover > 0:
-        remaining = [c for c in candidates if plan[c] < cap_map.get(c, 0)]
-        if not remaining:
-            break
-        best = max(remaining, key=tile_marginal_score)
-        if tile_marginal_score(best) <= 0:
-            break
-        plan[best] += 1
-        leftover -= 1
+    if primary and primary in cap_map:
+        want = cap_map[primary]
+        have = int(s["crops"].get(primary, 0) or 0)
+        # Berry engine with live EV owns leftover cash room (3q hole was
+        # PRIMARY_TILE_BASE[3]=48 leaving ~15 tiles empty). Pizza leftover
+        # still goes tomato-then-wheat below, not this branch.
+        if (
+            engine_of(s) == "BERRY"
+            and primary == "STRAWBERRY"
+            and plan_viable(s, "STRAWBERRY")
+        ):
+            want = leftover
+        elif engine_of(s) == "BERRY" and primary == "STRAWBERRY":
+            want = max(want, have)
+        take(primary, want)
 
-    # Slice A wheat filler: only when there is no berry shop demand yet.
-    # (This keeps `pick_crop`/plant scheduling aligned with `_buy_wheat_seeds()`.)
-    if (
-        berry_sink(s) == 0
-        and s["day"] <= PARAMS["wheat_filler_day_max"]
-        and leftover > 0
+    # Pizza-first towns still plant berries when a berry shop opens later.
+    # Carrots never get leftover — that was the FM steal.
+    if primary != "STRAWBERRY" and "STRAWBERRY" in cap_map:
+        take("STRAWBERRY", cap_map["STRAWBERRY"])
+
+    # Milk leftover densifies tomatoes a little, then wheat. Unplanted
+    # leftover wheat was 12 empty tiles on 761083594.
+    if leftover > 0 and engine_of(s) == "MILK" and primary == "TOMATO":
+        extra = min(leftover, 8)
+        plan["TOMATO"] = int(plan.get("TOMATO", 0) or 0) + extra
+        leftover -= extra
+
+    # Feed leftover, never a second cash crop. Berry maps leave the hole
+    # empty rather than flooding wheat over strawberries; only top up
+    # wheat when the planted+seeded feed floor is still short of plan.
+    if leftover > 0 and (
+        engine_of(s) == "MILK" or int(demand.get("STRAWBERRY", 0) or 0) == 0
     ):
         plan["WHEAT"] += leftover
+    elif leftover > 0 and engine_of(s) == "BERRY":
+        mouths = mouths_of(s)
+        feed_floor = mouths + int(PARAMS["wheat_buffer_add"]) if mouths else 0
+        wheat_have = int(s["crops"].get("WHEAT", 0) or 0) + int(
+            s["seeds"].get("WHEAT", 0) or 0
+        )
+        short = max(0, feed_floor - wheat_have - int(plan["WHEAT"]))
+        plan["WHEAT"] += min(leftover, short)
     return plan
 
 
@@ -965,25 +1123,42 @@ def cash_caps(s: dict[str, Any]) -> tuple[int, int]:
 
 
 def want_cows(s: dict[str, Any]) -> int:
-    if s["day"] > PARAMS["cow_day_max"] or milk_px(s) < PARAMS["cow_milk_px_min"]:
-        return s["cows"]
-    floor = PARAMS["cow_floor"] if s["day"] <= PARAMS["cow_floor_day_max"] else 0
+    target = cow_target(s, PARAMS)
+    floor = int(PARAMS["cow_floor"]) if s["day"] <= PARAMS["cow_floor_day_max"] else 0
     if s["cows"] < floor:
-        return floor
-    if milk_sink(s) == 0:
+        return min(s["cows"] + 1, max(target, floor))
+    if engine_of(s) != "MILK":
+        if target > s["cows"] and s["n_quads"] >= 2 and herd_can_expand(s):
+            primary = _primary_cash(s)
+            budget = _turn_budget(s)
+            seed_c = int(SEED_COST.get(primary or "STRAWBERRY", 100))
+            if cow_beats_seeds(
+                cow_ev=animal_score("COW", milk_px(s), s["day"]),
+                tile_ev=budget.tile_ev,
+                cow_cost=int(ANIMAL_COST["COW"]),
+                seed_cost=seed_c,
+                plantable=budget.plantable,
+                empty=int(s.get("empty") or 0),
+                buy_gap=crop_gap(crop_plan(s), s, primary) if primary else 0,
+            ):
+                return min(s["cows"] + 1, target)
         return s["cows"]
-    if s["n_quads"] == 1:
+    pizza_1q = s["n_quads"] == 1 and milk_sink(s) >= 2 and berry_sink(s) == 0
+    if s["n_quads"] == 1 and not pizza_1q:
         return s["cows"]
     if not herd_can_expand(s):
         return s["cows"]
-    sink = milk_sink(s)
-    milk_target = min(
-        int(PARAMS["cow_expand_cap"]),
-        max(int(floor), int(PARAMS["milk_herd_base"]) + sink),
+    cap = int(PARAMS["cow_expand_cap"])
+    if milk_sink(s) >= 3:
+        cap = max(cap, int(PARAMS["cow_stack_cap"]))
+    mouth_cap = (
+        int(PARAMS["mouth_cap_1q"]) if s["n_quads"] == 1 else int(PARAMS["mouth_cap_2qplus"])
     )
-    if s["cows"] < milk_target:
-        return min(s["cows"] + 1, milk_target)
-    return min(s["cows"] + 1, int(PARAMS["cow_expand_cap"]))
+    cap = min(cap, max(0, mouth_cap - s["sheep"] - s["geese"]))
+    goal = min(target, cap)
+    if s["cows"] < goal:
+        return min(s["cows"] + 1, goal)
+    return s["cows"]
 
 
 def want_sheep(s: dict[str, Any]) -> int:
@@ -1091,32 +1266,23 @@ def need_land(s: dict[str, Any]) -> bool:
             return True
         return False
     if s["n_quads"] == 2:
+        # Pizza / milk-stack densify 50 tiles. Early berry towns buy plot 3
+        # once the 2-quad board is packed (seed 42: $4.7k, 36 berries, 1 empty).
+        strat = map_strategy(s)
+        pizza_or_milk = milk_sink(s) >= 1 and berry_sink(s) == 0
+        if pizza_or_milk or strat == "MILK_STACK":
+            return False
+        if strat not in ("EARLY_BERRY", "LAND_SPRINT"):
+            if berry_sink(s) > 0 or milk_sink(s) >= 1:
+                return False
         if s["day"] < PARAMS["land2_day_min"]:
             return False
         if int(s["money"]) < PARAMS["land2_money_min"]:
             return False
-        strat = map_strategy(s)
-        relax = land_ramp_relax(s)
-        empty_max = int(PARAMS["land2_empty_max"])
-        if relax:
-            empty_max = strategy_land_empty_cap(
-                strat, PARAMS, n_quads=2, relax=True
-            )
-        else:
-            if late_berry_target_met(
-                s, PARAMS, berry_gap=gap, strategy=strat
-            ):
-                empty_max = int(PARAMS["board_fill_berry_met_cap_2q"])
-        if s["empty"] > empty_max:
+        # Plot 3 is a packed-board buy. Do not inherit late-ramp empty relax.
+        if s["empty"] > int(PARAMS["land2_empty_max"]):
             return False
-        skip_berry_min = land_ramp_relax(s) and int(
-            PARAMS["late_ramp_skip_strawberry_min"]
-        ) == 1
-        if (
-            not skip_berry_min
-            and berry_ok(s)
-            and s["crops"]["STRAWBERRY"] < PARAMS["land2_strawberry_min"]
-        ):
+        if berry_ok(s) and s["crops"]["STRAWBERRY"] < PARAMS["land2_strawberry_min"]:
             return False
         return True
     return False
@@ -1125,17 +1291,16 @@ def need_land(s: dict[str, Any]) -> bool:
 def plan_turn(s: dict[str, Any]) -> TurnPlan:
     """Single planning pass: crop targets, regime phase, market route, field mode."""
     crops = crop_plan(s)
-    berry_gap_n = max(
-        0,
-        crops.get("STRAWBERRY", 0)
-        - s["crops"].get("STRAWBERRY", 0)
-        - int(s["seeds"].get("STRAWBERRY", 0)),
-    )
+    primary = _primary_cash(s)
+    berry_gap_n = crop_gap(crops, s, "STRAWBERRY")
+    cash_gap_n = crop_gap(crops, s, primary)
     left = days_left(s["day"])
     demand = s.get("demand") or {}
+    # Stacked shops raise tile caps. They are not a sell-mode switch.
+    # Two bakeries used to flip SPIKE for the rest of seed 42.
     demand_stack = any(
         int(demand.get(c, 0)) >= 2
-        for c in ("TOMATO", "STRAWBERRY", "MILK", "EGG", "CARROT")
+        for c in ("TOMATO", "STRAWBERRY", "CARROT", "EGG")
     )
     spikes = {item: price_spike(s, item) for item in BASE_PRICE}
     late_ongoing = left < 8 and any(
@@ -1151,27 +1316,37 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
     )
     bok = crops.get("STRAWBERRY", 0) > 0
     strat = map_strategy(s)
+    cash_ramp_n = crop_is_ramping(s, primary, crops, late=lshop)
+    berry_ramp_n = crop_is_ramping(s, "STRAWBERRY", crops, late=lshop)
     # Collect flags before turn_plan exists (helpers fall through to live compute).
     fill_pressure = board_fill_pressure(
         s,
         PARAMS,
-        berry_gap=berry_gap_n,
-        berry_ok=bok,
+        berry_gap=max(berry_gap_n, cash_gap_n),
+        berry_ok=bok or cash_gap_n > 0,
         late_shop_sprint=lshop,
-        berry_ramp=berry_ramp(s),
+        berry_ramp=berry_ramp_n or cash_ramp_n,
         plant_sprint=plant_sprint(s),
         strategy=strat,
+    )
+    cash_crop = primary or ""
+    field_target = int(crops.get(cash_crop, 0) or 0) if cash_crop else 0
+    field_short = (
+        field_target > 0
+        and plant_gap(crops, s, cash_crop) > 0
+        and int(s.get("empty", 0) or 0) > 0
+        and engine_replant_open(s)
     )
     flags = TurnFlags(
         late_shop_sprint=lshop,
         berry_prep=prep,
         plant_sprint=plant_sprint(s),
-        berry_ramp=berry_ramp(s),
+        berry_ramp=berry_ramp_n,
         seed_fill_push=seed_fill_push(s),
         berry_replant_push=berry_replant_push(s),
         in_late_ramp=lshop,
         land_ramp_relax=_compute_land_ramp_relax(
-            s, strategy=strat, berry_gap=berry_gap_n, lshop=lshop
+            s, strategy=strat, berry_gap=max(berry_gap_n, cash_gap_n), lshop=lshop
         ),
         board_fill_pressure=fill_pressure,
         need_land=need_land(s),
@@ -1180,6 +1355,8 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
         late_ongoing=late_ongoing,
         demand_stack=demand_stack,
         price_spike=spikes,
+        cash_ramp=cash_ramp_n,
+        field_short=field_short,
     )
     tp = build_turn_plan(
         s,
@@ -1191,6 +1368,13 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
         days_left=left,
         endgame=endgame,
         strategy=strat,
+    )
+    tp.cash_crop = primary or ""
+    tp.cash_gap = cash_gap_n
+    tile_ev = plan_ev(s, primary) if primary else 0.0
+    prod_days = max(0, int(PARAMS["engine_replant_day_max"]) - int(s["day"]))
+    tp.budget = compute_turn_budget(
+        s, cash_crop=tp.cash_crop, tile_ev=tile_ev, productive_days=prod_days
     )
     s["turn_plan"] = tp
     s["regime"] = tp.regime
@@ -1351,9 +1535,19 @@ def pick_mode(s: dict[str, Any]) -> str:
 def cash_waiting(s: dict[str, Any], seeds: dict[str, int] | None = None) -> bool:
     seeds = seeds if seeds is not None else s["seeds"]
     plan = crop_plan(s)
-    return any(
+    if any(
         seeds.get(crop, 0) > 0 and s["crops"][crop] < plan.get(crop, 0)
         for crop in CASH_PLANT
+    ):
+        return True
+    # Sunk engine seeds: inventory is a buy-side budget, not a plant stop.
+    primary = _primary_cash(s)
+    return bool(
+        primary
+        and seeds.get(primary, 0) > 0
+        and int(s.get("empty") or 0) > 0
+        and engine_replant_open(s)
+        and (plan.get(primary, 0) > 0 or _hold_engine_crop(s, primary))
     )
 
 
@@ -1373,7 +1567,12 @@ def pick_crop(s: dict[str, Any], seeds: dict[str, int]) -> str | None:
     plan = crop_plan(s)
     shed_w = s["shed"].get("WHEAT", 0)
     mouths = mouths_of(s)
-    wheat_floor = max(4, plan.get("WHEAT", 0) if mouths else 0)
+    # Feed floor is tile_budget, not leftover wheat in the plan. Otherwise
+    # milk leftover wheat plants before the primary cash crop.
+    _, _, feed_wheat = tile_budget(s)
+    wheat_floor = max(4, feed_wheat if mouths else 0)
+    if mouths:
+        wheat_floor = max(wheat_floor, mouths + int(PARAMS["wheat_buffer_add"]))
     if s["crops"]["WHEAT"] < wheat_floor and seeds.get("WHEAT", 0) > 0:
         return "WHEAT"
     if s["crops"]["WHEAT"] == 0 and shed_w == 0 and seeds.get("WHEAT", 0) > 0:
@@ -1383,24 +1582,36 @@ def pick_crop(s: dict[str, Any], seeds: dict[str, int]) -> str | None:
         for crop in CASH_PLANT
         if seeds.get(crop, 0) > 0 and s["crops"][crop] < plan.get(crop, 0)
     ]
+    primary = _primary_cash(s) or "STRAWBERRY"
     if cash:
+        if primary in cash:
+            return primary
         return max(cash, key=lambda c: plan_ev(s, c))
+    primary_gap = plant_gap(plan, s, primary)
     if (
         in_late_ramp(s)
-        and s["day"] <= int(PARAMS["late_shop_sprint_cutoff_day"])
-        and seeds.get("STRAWBERRY", 0) > 0
+        and engine_replant_open(s)
+        and seeds.get(primary, 0) > 0
         and s["empty"] >= 2
-        and (berry_gap(s) > 0 or berry_ok(s))
+        and (primary_gap > 0 or plan.get(primary, 0) > 0)
     ):
-        return "STRAWBERRY"
+        return primary
     if (
-        berry_ok(s)
-        and s["day"] <= 26
-        and seeds.get("STRAWBERRY", 0) > 0
-        and berry_gap(s) > 0
-        and (s["day"] >= 12 or berry_ramp(s))
+        plan.get(primary, 0) > 0
+        and engine_replant_open(s)
+        and seeds.get(primary, 0) > 0
+        and primary_gap > 0
+        and (s["day"] >= 12 or cash_ramp(s) or berry_ramp(s))
     ):
-        return "STRAWBERRY"
+        return primary
+    if (
+        primary
+        and seeds.get(primary, 0) > 0
+        and int(s.get("empty") or 0) > 0
+        and engine_replant_open(s)
+        and (plan.get(primary, 0) > 0 or _hold_engine_crop(s, primary))
+    ):
+        return primary
     if s["crops"]["WHEAT"] < plan["WHEAT"] and seeds.get("WHEAT", 0) > 0:
         return "WHEAT"
     return None
@@ -1449,11 +1660,32 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                     urgency = -(ev_score + inv_score)
                 elif not t["watered_today"] and t.get("consecutive_unwatered", 0) >= 1:
                     priority = 0
-                    urgency = -5
+                    tile_ev = float(ctx.get("tile_ev") or 0.0)
+                    days = max(1, int(ctx.get("productive_days") or 1))
+                    urgency = -(max(tile_ev, 1.0) * days)
                 elif not t["watered_today"] and (hungry == 0 or not has_wheat):
-                    cash = t.get("crop") in CASH_CROPS
-                    if fert_ready == 0 or ctx.get("use_fert") or cash or not has_wheat:
-                        priority = 2 if ctx.get("use_fert") else 4
+                    crop = t.get("crop")
+                    cash = crop in CASH_CROPS
+                    engine = (
+                        not ctx.get("harvest_focus")
+                        and crop == ctx.get("cash_crop")
+                        and crop in CASH_CROPS
+                    )
+                    if (
+                        fert_ready == 0
+                        or ctx.get("use_fert")
+                        or cash
+                        or not has_wheat
+                        or engine
+                    ):
+                        if engine:
+                            # One hour of live yield. Beats plant (priority 1).
+                            priority = 0
+                            urgency = -max(float(ctx.get("tile_ev") or 0.0), 1.0)
+                        elif ctx.get("use_fert"):
+                            priority = 2
+                        else:
+                            priority = 4
                 elif (
                     has_fertilizer
                     and t.get("crop") in CASH_CROPS
@@ -1489,10 +1721,7 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                     priority = 2
             elif isinstance(t, dict) and t.get("kind") == "WEED":
                 if hungry == 0:
-                    if ctx.get("fill_board"):
-                        priority = 0
-                        urgency = 8
-                    elif ctx.get("cash_waiting"):
+                    if ctx.get("cash_waiting"):
                         priority = 1
                         urgency = 3
                     else:
@@ -1501,14 +1730,21 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
             elif t is None:
                 waiting_plant = ctx.get("cash_waiting") or ctx.get("wheat_waiting")
                 waiting_berry = ctx.get("berry_waiting")
-                if (
-                    ctx.get("fill_board")
-                    and hungry == 0
-                    and has_seeds
-                    and (waiting_plant or waiting_berry)
-                ):
-                    priority = 0
-                    urgency = 10
+                if hungry == 0 and has_seeds and (waiting_plant or waiting_berry):
+                    tile_ev = float(ctx.get("tile_ev") or 0.0)
+                    days = max(1, int(ctx.get("productive_days") or 1))
+                    # After live plants are watered this hour, leftover seeds
+                    # share priority 0 with water (post-land fill).
+                    live_dry = int(ctx.get("unwatered") or 0)
+                    if live_dry == 0 and (
+                        ctx.get("plant_sprint")
+                        or int(ctx.get("empty") or 0) > int(ctx.get("workers") or 0)
+                    ):
+                        priority = 0
+                        urgency = -(max(tile_ev, 1.0) * days)
+                    else:
+                        priority = 1
+                        urgency = -(max(tile_ev, 1.0) * days)
                 elif (
                     ctx.get("need_pasture") or ctx.get("need_coop")
                 ) and not waiting_plant:
@@ -1693,6 +1929,14 @@ def action_for(tiles, x, y, day, seeds, claimed, s, inv, ctx):
         reserve = max(0, reserve)
         if s["day"] <= 1:
             reserve = max(reserve, 2)
+        if (
+            current_engine(s) == "MILK"
+            and milk_sink(s) >= 1
+            and s["n_quads"] >= 2
+            and want_cows(s) > s["cows"]
+            and s["day"] <= int(PARAMS["animal_buy_day_max"])
+        ):
+            reserve = max(reserve, 2)
         if (not feeding) and not carried and s["empty"] > reserve:
             crop = pick_crop(s, seeds)
             if crop is not None:
@@ -1797,6 +2041,9 @@ def _buy_wheat_seeds(
         else 0
     )
     wheat_tiles += buffer
+    mouths = mouths_of(s)
+    if mouths >= 4:
+        wheat_tiles += 2
     have_w = s["crops"]["WHEAT"] + seeds.get("WHEAT", 0)
     if have_w >= wheat_tiles:
         return afford
@@ -1817,6 +2064,7 @@ def _hire_up_to(
     cap = HIRES_PER_TURN if max_hires is None else max(0, max_hires)
     want = want_hands(s)
     n_hire = min(cap, max(0, want - s["hires_today"]))
+    hired = 0
     for _ in range(n_hire):
         cost = fib_hire_cost(s["hires_today"])
         if afford < cost + (40 if mouths_of(s) > 0 else 0):
@@ -1824,6 +2072,14 @@ def _hire_up_to(
         market.append(["HIRE"])
         afford -= cost
         s["hires_today"] += 1
+        hired += 1
+    if hired:
+        # Hands join next step, but day-capacity planning must see the crew
+        # we just paid for (else land/seed NPV use a stale TurnBudget).
+        s["workers"] = int(s.get("workers") or 0) + hired
+        tp = s.get("turn_plan")
+        if tp is not None:
+            tp.budget = None
     return afford
 
 
@@ -1832,9 +2088,14 @@ def _maybe_buy_land(market: list, afford: int, s: dict[str, Any]) -> int:
         return afford
     cost = LAND_COST[s["n_quads"] - 1]
     market.append(["BUY_LAND"])
-    # Land buy should trigger a short, aggressive replant window so the
-    # board fills quickly enough for later land upgrades.
-    _LAND_SPRINT["until_day"] = s["day"] + 2
+    # Same-hour seed buys must see the new plot. Seed 42 bought 12 berries
+    # against the old 4 empty tiles, then sat on 27 empty the next dawn.
+    s["n_quads"] = int(s["n_quads"]) + 1
+    s["empty"] = int(s["empty"]) + 25
+    sprint_days = 4 if s["n_quads"] >= 3 else 2
+    _LAND_SPRINT["until_day"] = s["day"] + sprint_days
+    s.pop("turn_plan", None)
+    plan_turn(s)
     return afford - cost
 
 
@@ -1864,36 +2125,27 @@ def _buy_planned_seeds(
     seeds: dict[str, int],
     *,
     berry_only: bool = False,
+    after_land: bool = False,
 ) -> int:
+    if s.get("_seeds_bought_this_market"):
+        return afford
     plan = crop_plan(s)
     rescue = bool(s.get("liquidity_rescue", False))
-    cash_planned = any(plan.get(c, 0) > 0 for c in CASH_PLANT)
-    cap_n = 8 if cash_planned else 4
-    if s["n_quads"] >= 2 and afford >= 1600:
-        cap_n = 12
-    if s["n_quads"] >= 3 and afford >= 2000:
-        cap_n = 16
-    if berry_replant_push(s):
-        cap_n = max(cap_n, 16)
-    elif berry_ramp(s):
-        cap_n = max(cap_n, 8)
-    if seed_fill_push(s):
-        cap_n = max(cap_n, min(16, s["empty"]))
-    tp = s.get("turn_plan")
-    if tp is not None and tp.flags.late_shop_sprint:
-        cap_n = max(cap_n, 16)
-    elif late_shop_sprint(s):
-        cap_n = max(cap_n, 16)
-    for c in CASH_PLANT:
-        if uptrend_frontrun(s, c) and plan.get(c, 0) > 0:
-            cap_n = max(cap_n, int(PARAMS["frontrun_cap_bonus"]))
-            break
-    if rescue:
-        cap_n = max(cap_n, 12)
+    budget = _turn_budget(s)
+    if after_land:
+        cap_n = post_land_seed_cap(
+            workers=budget.workers,
+            hungry=budget.hungry,
+            live_tiles=budget.live_tiles,
+            empty=int(s.get("empty") or 0),
+        )
+    else:
+        # This hour only — do not stockpile beyond plantable hands.
+        cap_n = max(0, min(int(budget.plantable), int(s.get("empty") or 0)))
+    if cap_n <= 0:
+        return afford
     order = [c for c in CASH_PLANT if plan.get(c, 0) > 0]
 
-    # "Stock market" style ranking: prefer crops where we still need tiles,
-    # with highest EV, boosted slightly by upward price momentum.
     def marginal_score(c: str) -> float:
         have = s["crops"][c] + seeds.get(c, 0)
         need_tiles = plan[c] - have
@@ -1905,62 +2157,127 @@ def _buy_planned_seeds(
         if uptrend_frontrun(s, c):
             score *= float(PARAMS["frontrun_score_mult"])
         if rescue:
-            # Liquidity rescue: favor faster payback crops to recover cashflow.
             payback_days = {"STRAWBERRY": 5.0, "CARROT": 3.0, "TOMATO": 4.0, "MELON": 10.0}.get(c, 6.0)
             score *= (6.0 / payback_days)
         return score
 
     order.sort(key=marginal_score, reverse=True)
-    fill_push = seed_fill_push(s)
+    primary = _primary_cash(s)
     if berry_only:
-        # Conservative mode: one crop unless land-sprint fill needs diversity.
-        if plan.get("STRAWBERRY", 0) > 0:
+        if primary and plan.get(primary, 0) > 0:
+            order = [primary]
+        elif plan.get("STRAWBERRY", 0) > 0:
             order = ["STRAWBERRY"]
         else:
             order = order[: 2 if plant_sprint(s) else 1]
     remaining = list(order)
+    bought_any = False
     while remaining and afford > 0 and len(market) < MARKET_LIMIT:
         remaining.sort(key=marginal_score, reverse=True)
         crop = remaining[0]
         have = s["crops"][crop] + seeds.get(crop, 0)
         need = plan[crop] - have
+        empty_n = max(0, int(s.get("empty", 0)))
+        need = min(need, empty_n, cap_n)
         if need <= 0:
             remaining.pop(0)
             continue
 
-        if crop == "STRAWBERRY":
-            if berry_replant_push(s):
-                keep = 80
-            elif berry_ramp(s):
-                keep = 200
-            elif late_shop_sprint(s):
-                keep = 120
-            else:
-                keep = 400 if s["n_quads"] >= 2 else 800
-            if plant_sprint(s):
-                keep = min(keep, 200)
-            elif s["empty"] >= 12:
-                keep = min(keep, 120)
-            if berry_only:
-                need = max(need, min(8, max(4, berry_gap(s) + 2)))
+        tp = s.get("turn_plan")
+        if crop == "STRAWBERRY" or crop == primary:
+            keep = (
+                int(tp.profile.post_land_floor)
+                if tp is not None
+                else int(PARAMS["land_post_floor_default"])
+            )
+            if s["n_quads"] < 2:
+                keep = max(keep, 400)
         else:
-            keep = 200 if plant_sprint(s) else 800
+            keep = 400
 
         if rescue:
             keep = int(keep * 0.6)
-        # Safety clamp: never reserve more cash than we currently have.
         keep = max(0, min(afford - 1, keep))
 
-        if not berry_only and crop != "STRAWBERRY" and len(market) >= MARKET_LIMIT:
+        if not berry_only and crop != "STRAWBERRY" and crop != primary and len(market) >= MARKET_LIMIT:
             break
 
         n_before = len(market)
         afford = _append_seed(market, afford, crop, min(need, cap_n), keep=keep)
         if len(market) > n_before:
-            seeds[crop] = seeds.get(crop, 0) + int(market[-1][2])
+            bought = int(market[-1][2])
+            seeds[crop] = seeds.get(crop, 0) + bought
+            cap_n = max(0, cap_n - bought)
+            bought_any = True
+            if cap_n <= 0:
+                break
         else:
             break
+    if bought_any:
+        s["_seeds_bought_this_market"] = True
     return afford
+
+
+def _land_project_npv(s: dict[str, Any], afford: int) -> float:
+    if not need_land(s) or s["n_quads"] >= 4:
+        return 0.0
+    if not _will_buy_land(s, afford):
+        return 0.0
+    cost = LAND_COST[s["n_quads"] - 1]
+    primary = _primary_cash(s)
+    budget = _turn_budget(s)
+    plantable_new = min(25, budget.day_plantable)
+    seed_c = int(SEED_COST.get(primary or "WHEAT", 10))
+    skip = skip_days_after_land(
+        live_tiles=budget.live_tiles,
+        extra_empty=25,
+        workers=budget.workers,
+    )
+    return land_expansion_npv(
+        plantable_new=plantable_new,
+        tile_ev=budget.tile_ev,
+        productive_days=budget.productive_days,
+        land_cost=cost,
+        seed_cost=seed_c,
+        live_tiles=budget.live_tiles,
+        skip_days=skip,
+    )
+
+
+def _seed_project_score(s: dict[str, Any]) -> tuple[float, int]:
+    primary = _primary_cash(s)
+    if not primary:
+        return 0.0, 0
+    plan = crop_plan(s)
+    budget = _turn_budget(s)
+    need = max(
+        0,
+        int(plan.get(primary, 0) or 0)
+        - int(s["crops"].get(primary, 0) or 0)
+        - int(s["seeds"].get(primary, 0) or 0),
+    )
+    n = min(need, int(s.get("empty") or 0), int(budget.plantable))
+    if n <= 0:
+        return 0.0, 0
+    ev = seed_project_ev(
+        tile_ev=budget.tile_ev,
+        productive_days=budget.productive_days,
+        n_seeds=n,
+        seed_cost=int(SEED_COST.get(primary, 100)),
+    )
+    return ev, n
+
+
+def _cow_project_score(s: dict[str, Any]) -> float:
+    if want_cows(s) <= s["cows"]:
+        return 0.0
+    budget = _turn_budget(s)
+    # animal_score is coins/day; scale to the same horizon as seed/land NPV.
+    per_day = cow_project_ev(
+        cow_ev=animal_score("COW", milk_px(s), s["day"]),
+        cow_cost=int(ANIMAL_COST["COW"]),
+    )
+    return per_day * max(1, int(budget.productive_days))
 
 
 def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
@@ -1979,6 +2296,8 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
         return afford
     if s["crops"]["WHEAT"] < 4:
         return afford
+    if _feed_crisis(s) and not below_floor:
+        return afford
     if not below_floor and not herd_can_expand(s):
         return afford
     if not below_floor and mouths_of(s) >= s["crops"]["WHEAT"]:
@@ -1990,9 +2309,15 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     if mouths_of(s) >= mouth_cap:
         return afford
     if s["n_quads"] == 1 and cash_shop(s) and cash_room < 6 and not below_floor:
-        return afford
+        if milk_sink(s) < 2:
+            return afford
     seed_gap = berry_gap(s)
-    reserve = min(900, seed_gap * SEED_COST["STRAWBERRY"])
+    primary = _primary_cash(s)
+    if primary and primary != "STRAWBERRY":
+        seed_gap = max(seed_gap, crop_gap(crop_plan(s), s, primary))
+    reserve = min(900, seed_gap * SEED_COST.get(primary or "STRAWBERRY", 100))
+    if engine_of(s) == "MILK":
+        reserve = min(reserve, 200)
     if below_floor:
         reserve = min(reserve, 200)
     cash_floor = (
@@ -2229,6 +2554,10 @@ def _hire_budget(s: dict[str, Any], market: list, *, reserve_land: bool) -> int:
         reserved += 1
     if berry_ok(s) and berry_gap(s) > 0:
         reserved += 1
+    elif (s.get("turn_plan") and int(getattr(s["turn_plan"], "cash_gap", 0) or 0) > 0):
+        reserved += 1
+    elif crop_gap(crop_plan(s), s, _primary_cash(s)) > 0:
+        reserved += 1
     _, _, wheat_tiles = tile_budget(s)
     if s["crops"]["WHEAT"] + s["seeds"].get("WHEAT", 0) < wheat_tiles:
         reserved += 1
@@ -2256,11 +2585,11 @@ def _pack_market(market: list, limit: int = MARKET_LIMIT) -> list:
             return (1, 0)
         if op == "BUY_PRODUCT" and act[1] == "WHEAT":
             return (2, 0)
-        if op == "BUY_SEED" and act[1] in CASH_PLANT:
-            return (3, 0)
-        if op == "HIRE":
-            return (4, 0)
         if op == "BUY_SEED" and act[1] == "WHEAT":
+            return (3, 0)
+        if op == "BUY_SEED" and act[1] in CASH_PLANT:
+            return (4, 0)
+        if op == "HIRE":
             return (5, 0)
         if op == "BUY_SEED":
             return (6, 0)
@@ -2287,6 +2616,7 @@ def _pack_market(market: list, limit: int = MARKET_LIMIT) -> list:
     force(lambda a: a and a[0] == "BUY_PRODUCT" and a[1] == "WHEAT")
     force(lambda a: a and a[0] == "BUY_SEED" and a[1] in CASH_PLANT)
     force(lambda a: a and a[0] == "BUY_SEED" and a[1] == "WHEAT")
+    force(lambda a: a and a[0] == "BUY_ANIMAL" and a[1] == "COW")
     return [act for i, act in enumerate(market) if i in keep]
 
 
@@ -2305,26 +2635,45 @@ def market_for(s: dict[str, Any], mode: str) -> list:
     tp = s["turn_plan"]
 
     market, afford, s2 = _start_market(s, mode)
+    s2["_seeds_bought_this_market"] = False
     berry_gap_start = tp.berry_gap
     if mode == "LIQUIDATE":
         afford = _hire_up_to(market, afford, s2)
         return _pack_market(market)
 
-    if tp.market_route == "late_sprint" and (s2["empty"] >= 8 or berry_gap_start > 0):
-        if need_land(s2):
-            afford = _maybe_buy_land(market, afford, s2)
+    if tp.market_route == "late_sprint" and (
+        s2["empty"] >= 8 or berry_gap_start > 0 or tp.cash_gap > 0
+    ):
         hire_cap = tp.profile.hire_cap or HIRES_PER_TURN
         hire_n = min(_hire_budget(s2, market, reserve_land=False), hire_cap)
         afford = _hire_up_to(market, afford, s2, hire_n)
-        afford = _buy_planned_seeds(
-            market, afford, s2, s2["seeds"], berry_only=True
+        land_npv = _land_project_npv(s2, afford)
+        cow_ev = _cow_project_score(s2) if not tp.defer_animals else 0.0
+        seed_ev, _ = _seed_project_score(s2)
+        pick = choose_project(
+            land_npv=land_npv,
+            can_land=land_npv > 0,
+            cow_ev=cow_ev,
+            can_cow=cow_ev > 0 and afford >= ANIMAL_COST["COW"],
+            seed_ev=seed_ev,
+            can_seed=seed_ev > 0,
         )
+        if pick == "land":
+            afford = _maybe_buy_land(market, afford, s2)
+            afford = _buy_planned_seeds(
+                market, afford, s2, s2["seeds"], berry_only=True, after_land=True
+            )
+        elif pick == "cow":
+            afford = _buy_animals(market, afford, s2)
+        else:
+            afford = _buy_planned_seeds(
+                market, afford, s2, s2["seeds"], berry_only=True
+            )
         afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
         afford = _buy_feed_wheat(market, afford, s2)
         return _pack_market(market)
 
     if tp.market_route == "berry_prep":
-        afford = _maybe_buy_land(market, afford, s2)
         hire_cap = tp.profile.hire_cap or HIRES_PER_TURN
         hire_n = min(
             _hire_budget(s2, market, reserve_land=need_land(s2)),
@@ -2332,27 +2681,52 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         )
         afford = _hire_up_to(market, afford, s2, hire_n)
         afford = _buy_berry_prep_seeds(market, afford, s2, s2["seeds"])
+        afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
+        return _pack_market(market)
 
-    can_land = _will_buy_land(s2, afford)
-    prep_land = can_land and cash_shop(s2)
-    if prep_land:
-        hire_n = _hire_budget(s2, market, reserve_land=True)
-        afford = _hire_up_to(market, afford, s2, hire_n)
-        afford = _buy_planned_seeds(market, afford, s2, s2["seeds"], berry_only=True)
+    # Hire first so day_plantable reflects the crew we can afford.
+    hire_n = _hire_budget(s2, market, reserve_land=need_land(s2))
+    afford = _hire_up_to(market, afford, s2, hire_n)
+
+    land_npv = _land_project_npv(s2, afford)
+    cow_ev = 0.0 if tp.defer_animals else _cow_project_score(s2)
+    seed_ev, _ = _seed_project_score(s2)
+    # Pizza / milk stack: mouths outrank tomato seed stockpiles.
+    if (
+        current_engine(s2) == "MILK"
+        and milk_sink(s2) >= 2
+        and cow_ev > 0
+        and not tp.defer_animals
+    ):
+        cow_ev = max(cow_ev, seed_ev + 1.0)
+    # 1→2 land is survival; keep it eligible even if NPV is soft.
+    can_land = land_npv > 0 or (s2["n_quads"] == 1 and _will_buy_land(s2, afford))
+    if s2["n_quads"] == 1 and can_land and land_npv <= 0:
+        land_npv = 1.0
+    pick = choose_project(
+        land_npv=land_npv,
+        can_land=can_land,
+        cow_ev=cow_ev,
+        can_cow=cow_ev > 0 and afford >= ANIMAL_COST["COW"],
+        seed_ev=seed_ev,
+        can_seed=seed_ev > 0,
+    )
+
+    if pick == "land":
         afford = _maybe_buy_land(market, afford, s2)
+        afford = _buy_planned_seeds(
+            market, afford, s2, s2["seeds"], berry_only=True, after_land=True
+        )
+    elif pick == "cow":
+        afford = _buy_animals(market, afford, s2)
+        afford = _buy_planned_seeds(market, afford, s2, s2["seeds"])
     else:
-        afford = _maybe_buy_land(market, afford, s2)
-        hire_n = _hire_budget(s2, market, reserve_land=False)
-        afford = _hire_up_to(market, afford, s2, hire_n)
-        if tp.flags.berry_ramp:
-            ramp_conservative = not tp.flags.seed_fill_push
-            afford = _buy_planned_seeds(
-                market, afford, s2, s2["seeds"], berry_only=ramp_conservative
-            )
+        afford = _buy_planned_seeds(market, afford, s2, s2["seeds"])
+
     afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
-    afford = _buy_planned_seeds(market, afford, s2, s2["seeds"])
     afford = _buy_feed_wheat(market, afford, s2)
-    if afford >= 1200 and len(market) < MARKET_LIMIT and not tp.defer_animals:
+    # Leftover cow if seeds/land did not win and cash remains.
+    if pick != "cow" and afford >= 1200 and len(market) < MARKET_LIMIT and not tp.defer_animals:
         _buy_animals(market, afford, s2)
     return _pack_market(market)
 
@@ -2364,6 +2738,7 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
         _LATE_SHOP_SPRINT["until_day"] = -1
         _SHOP_TRACK["prev_shops"] = set()
         _SHOP_TRACK["first_berry_day"] = None
+        _SHOP_TRACK["first_milk_day"] = None
         _SHOP_TRACK["archetype"] = "UNKNOWN"
         _SHOP_TRACK["archetype_locked"] = False
         _UPTREND_HOURS.clear()
@@ -2381,7 +2756,7 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
     n_feeders = min(s["workers"], s["hungry"]) if s["hungry"] else 0
     early_wheat = s["hungry"] > 0 and s["shed"].get("WHEAT", 0) == 0
     sprint = tp.flags.plant_sprint
-    ramp = tp.flags.berry_ramp
+    ramp = tp.flags.berry_ramp or tp.flags.cash_ramp
     plan = tp.crops
     sell_n_est = _compute_sell_n(s, mode)
 
@@ -2408,8 +2783,27 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
         "berry_ramp": ramp,
         "fill_board": tp.fill_board,
         "harvest_focus": tp.harvest_focus,
+        "cash_crop": tp.cash_crop,
+        "empty": s["empty"],
+        "workers": int(s.get("workers") or 0),
+        "tile_ev": float(tp.budget.tile_ev) if tp.budget else 0.0,
+        "productive_days": int(tp.budget.productive_days) if tp.budget else 1,
+        "plantable": int(tp.budget.plantable) if tp.budget else 0,
         "berry_waiting": (
-            seeds.get("STRAWBERRY", 0) > 0 and tp.flags.berry_ok and tp.berry_gap > 0
+            seeds.get("STRAWBERRY", 0) > 0
+            and tp.flags.berry_ok
+            and (
+                tp.berry_gap > 0
+                or (int(s.get("empty") or 0) > 0 and engine_replant_open(s))
+            )
+        )
+        or (
+            bool(tp.cash_crop)
+            and seeds.get(tp.cash_crop, 0) > 0
+            and (
+                tp.cash_gap > 0
+                or (int(s.get("empty") or 0) > 0 and engine_replant_open(s))
+            )
         ),
         "cash_seeds": (
             seeds.get("STRAWBERRY", 0) > 0

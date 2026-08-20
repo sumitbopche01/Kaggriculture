@@ -1,7 +1,7 @@
 {
-  "animal_buy_day_max": 20,
+  "animal_buy_day_max": 24,
   "animal_cash_floor_2qplus": 400,
-  "cow_day_max": 20,
+  "cow_day_max": 24,
   "cow_expand_cap": 10,
   "cow_floor": 2,
   "cow_floor_day_max": 20,
@@ -24,7 +24,7 @@
   "sheep_floor_day_max": 20,
   "sheep_wool_px_min": 80,
   "wheat_buffer_add": 2,
-  "wheat_engine_day_max": 20,
+  "wheat_engine_day_max": 24,
   "wheat_filler_day_max": 20,
   "wheat_min_tiles": 6,
   "wheat_no_mouth_tiles": 4

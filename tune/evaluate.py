@@ -20,6 +20,17 @@ ROOT = Path(__file__).resolve().parents[1]
 AGENT = str(ROOT / "main.py")
 DEFAULT_PARAMS_PATH = str(ROOT / "tune" / "params.json")
 
+
+def _agent_path() -> str:
+    """Override with KAGGRICULTURE_AGENT=main_v2.py for the target-design agent."""
+    override = os.environ.get("KAGGRICULTURE_AGENT")
+    if override:
+        p = Path(override)
+        if not p.is_absolute():
+            p = ROOT / p
+        return str(p)
+    return AGENT
+
 # Keep in sync with tests/test_regression.py
 MEAN_SEEDS_15 = [42, 7, 13, 21, 33, 55, 89, 99, 123, 256, 777, 1024, 2024, 3141, 993781610]
 # "30 seeds" = MEAN_SEEDS (15) + EXTRA_SEEDS (13) + {2063069147, 195016893}
@@ -62,7 +73,7 @@ def run_vs_starter(seed: int, *, episode_steps: int = 720) -> tuple[int, int]:
     # intended params file (and not a path relative to a temp working dir).
     os.environ.setdefault("KAGGRICULTURE_PARAMS_PATH", DEFAULT_PARAMS_PATH)
     env = make("kaggriculture", configuration={"episodeSteps": episode_steps, "seed": seed}, debug=False)
-    env.run([AGENT, "starter"])
+    env.run([_agent_path(), "starter"])
     return int(env.steps[-1][0]["reward"]), int(env.steps[-1][1]["reward"])
 
 
@@ -77,7 +88,7 @@ def run_vs_starter_env(
     env = make(
         "kaggriculture", configuration={"episodeSteps": episode_steps, "seed": seed}, debug=False
     )
-    env.run([AGENT, "starter"])
+    env.run([_agent_path(), "starter"])
     us = int(env.steps[-1][0]["reward"])
     starter = int(env.steps[-1][1]["reward"])
     return env, us, starter

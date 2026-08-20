@@ -91,7 +91,7 @@ def _suggest_params(trial: optuna.trial.Trial) -> dict[str, int | float]:
         # Land timing / guardrails
         "land_day_min": trial.suggest_int("land_day_min", 4, 8),
         "land_day_max": trial.suggest_int("land_day_max", 20, 26),
-        "max_quads_for_land": 3,  # keep fixed to avoid massive structural changes
+        "max_quads_for_land": 2,  # densify two quads; a full board is not plot 3
         "land2_day_min": trial.suggest_int("land2_day_min", 9, 13),
         "land2_money_min": trial.suggest_int("land2_money_min", 3000, 6000),
         "land2_empty_max": trial.suggest_int("land2_empty_max", 3, 6),
