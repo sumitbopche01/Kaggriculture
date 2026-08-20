@@ -206,7 +206,10 @@ def classify_phase(
     price_spike_any: bool,
     days_left: int,
 ) -> Phase:
-    if s["day"] >= int(params["liquidate_day_min"]):
+    from brain.schedules import late_dump_day
+
+    dump = late_dump_day(int(params["liquidate_day_min"]))
+    if s["day"] >= dump:
         return "LIQUIDATE"
     if days_left <= int(params["endgame_days_left"]):
         return "ENDGAME"
@@ -283,7 +286,9 @@ def compute_sell_n(
         sell_n = max(sell_n, prof.sell_n_endgame)
 
     # Replay late-sell share ~36%; start dumping before LIQUIDATE.
-    dump_day = int(params.get("liquidate_day_min", 26))
+    from brain.schedules import late_dump_day
+
+    dump_day = late_dump_day(int(params.get("liquidate_day_min", 26)))
     if mode != "LIQUIDATE" and int(s.get("day", 0)) >= max(22, dump_day - 4):
         sell_n = max(sell_n, int(params.get("sell_n_pre_dump", 6)))
 

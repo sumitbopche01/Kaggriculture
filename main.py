@@ -135,6 +135,9 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "melon_n_quads_min": 1,
     "melon_day_max": 16,
     "melon_cap": 12,
+    "melon_bridge_cow_day_max": 12,
+    "melon_bridge_cow_cap": 8,
+    "melon_bridge_melon_min": 6,
     # Herd ramp gates
     "cow_day_max": 24,
     "cow_milk_px_min": 80,
@@ -157,11 +160,13 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "land2_empty_max": 4,
     # Replay winners buy plot-3 near day 11 with ~10–12 berries, not 16.
     "land2_strawberry_min": 10,
+    "land2_schedule_cow_min": 4,
+    "land2_schedule_empty_max": 6,
     "berry_milk_cow_cap": 10,
     "berry_milk_cow_extra": 4,
-    "berry_herd_mouth_cap": 10,
+    "berry_herd_mouth_cap": 12,
     "berry_animal_buy_day_max": 18,
-    "berry_cow_hard_cap": 8,
+    "berry_cow_hard_cap": 10,
     "late_berry_tomato_cap": 24,
     "land2_sprint_strawberry_min": 24,
     "sell_n_pre_dump": 7,
@@ -1194,6 +1199,25 @@ def want_cows(s: dict[str, Any]) -> int:
     # Milk-led = pizza densify (milk shops, no berry). Else ice-cream garnish.
     milk_led = milk_sink(s) >= 1 and berry_sink(s) == 0
     if not milk_led:
+        # Melon→cow bridge on smoothie/ice-cream maps only. Elites stock
+        # cows before berry EV clears (kay ~8 @d10); cap stays modest so
+        # yarn/bakery boards (seed 55) are not overgrazed.
+        melons = int(s["crops"].get("MELON", 0) or 0)
+        dual = sum(
+            1
+            for sh in (s.get("shops") or [])
+            if sh in ("ICE_CREAM_SHOP", "SMOOTHIE_SHOP")
+        )
+        bridge_cap = int(PARAMS.get("melon_bridge_cow_cap", 5))
+        if (
+            int(s["day"]) <= int(PARAMS.get("melon_bridge_cow_day_max", 12))
+            and s["n_quads"] >= 2
+            and dual >= 1
+            and melons >= int(PARAMS.get("melon_bridge_melon_min", 6))
+            and herd_can_expand(s)
+            and s["cows"] < bridge_cap
+        ):
+            return min(s["cows"] + 1, bridge_cap)
         if target > s["cows"] and s["n_quads"] >= 2 and herd_can_expand(s):
             primary = _primary_cash(s)
             budget = _turn_budget(s)
@@ -1335,33 +1359,45 @@ def need_land(s: dict[str, Any]) -> bool:
             return True
         return False
     if s["n_quads"] == 2:
-        # Pizza / milk-stack densify 50 tiles. Early berry towns buy plot 3
-        # once the 2-quad board is packed (seed 42: $4.7k, 36 berries, 1 empty).
+        # Pizza / milk-stack densify 50 tiles. Berry towns buy plot 3 on the
+        # elite schedule window (~d10–11, 75% of $85k+ ladder winners).
         strat = map_strategy(s)
         pizza_or_milk = milk_sink(s) >= 1 and berry_sink(s) == 0
         if pizza_or_milk or strat == "MILK_STACK":
             return False
+        berries = int(s["crops"].get("STRAWBERRY", 0) or 0)
+        melons = int(s["crops"].get("MELON", 0) or 0)
         if strat not in ("EARLY_BERRY", "LAND_SPRINT"):
             if berry_sink(s) > 0 or milk_sink(s) >= 1:
                 return False
         # LAND_SPRINT is mainly a 1→2 densify cue. Plot-3 only when the
         # berry stand is already fat (seed 21 bought hollow plot-3 at ~6 berries).
-        if strat == "LAND_SPRINT" and int(s["crops"].get("STRAWBERRY", 0) or 0) < int(
+        if strat == "LAND_SPRINT" and berries < int(
             PARAMS.get("land2_sprint_strawberry_min", 24)
         ):
             return False
-        if s["day"] < PARAMS["land2_day_min"]:
+        from brain.schedules import berry_land2_day, berry_land2_strawberry_floor
+
+        land2_day = berry_land2_day(int(PARAMS["land2_day_min"]))
+        # Elites unlock ~median land2 day; keep hard floor, no early buy.
+        if int(s["day"]) < max(int(PARAMS["land2_day_min"]), land2_day - 1):
+            return False
+        if int(s["day"]) > int(PARAMS.get("land2_day_max", 22)):
             return False
         if int(s["money"]) < PARAMS["land2_money_min"]:
             return False
-        # Plot 3 is a packed-board buy. Do not inherit late-ramp empty relax.
-        if s["empty"] > int(PARAMS["land2_empty_max"]):
+        # Packed default; schedule buyers often still have a few empties.
+        empty_max = int(PARAMS["land2_empty_max"])
+        if (
+            int(s["cows"]) >= int(PARAMS.get("land2_schedule_cow_min", 4))
+            and (berries >= 12 or melons >= 6)
+        ):
+            empty_max = max(empty_max, int(PARAMS.get("land2_schedule_empty_max", 6)))
+        if s["empty"] > empty_max:
             return False
         if berry_sink(s) > 0:
-            from brain.schedules import berry_land2_strawberry_floor
-
             berry_min = berry_land2_strawberry_floor(int(PARAMS["land2_strawberry_min"]))
-            if s["crops"]["STRAWBERRY"] < berry_min:
+            if berries < berry_min and melons < 6:
                 return False
         return True
     return False
@@ -1390,9 +1426,10 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
     prep = berry_prep_active(s)
     cash_deficit = _cash_deficit(s)
     liquidity_stress = cash_deficit >= 900
-    endgame = left <= int(PARAMS["endgame_days_left"]) or s["day"] >= int(
-        PARAMS["liquidate_day_min"]
-    )
+    from brain.schedules import late_dump_day
+
+    dump_day = late_dump_day(int(PARAMS["liquidate_day_min"]))
+    endgame = left <= int(PARAMS["endgame_days_left"]) or s["day"] >= dump_day
     bok = crops.get("STRAWBERRY", 0) > 0
     strat = map_strategy(s)
     cash_ramp_n = crop_is_ramping(s, primary, crops, late=lshop)
@@ -1480,6 +1517,11 @@ def want_hands(s: dict[str, Any]) -> int:
         base = 8
     # Feeders share the crew — leave room above pure water cover.
     need = cover + max(0, mouths_of(s) // 3)
+    # Steal elite hire curve (ladder $85k+ winners hit ~9–10 hands by d6–8).
+    if int(s["day"]) <= 15 and (berry_sink(s) > 0 or engine_of(s) == "BERRY"):
+        from brain.schedules import hire_target_day
+
+        need = max(need, hire_target_day(int(s["day"]), default=base))
     return min(MAX_HANDS, max(base, need))
 
 
@@ -1656,7 +1698,10 @@ def pick_mode(s: dict[str, Any]) -> str:
     tp = s.get("turn_plan")
     if tp is not None:
         return tp.mode
-    if s["day"] >= int(PARAMS["liquidate_day_min"]):
+    from brain.schedules import late_dump_day
+
+    dump = late_dump_day(int(PARAMS["liquidate_day_min"]))
+    if s["day"] >= dump:
         return "LIQUIDATE"
     return "ENGINE"
 

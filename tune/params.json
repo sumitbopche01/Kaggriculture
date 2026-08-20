@@ -12,11 +12,13 @@
   "land2_empty_max": 4,
   "land2_money_min": 3500,
   "land2_strawberry_min": 10,
+  "land2_schedule_cow_min": 4,
+  "land2_schedule_empty_max": 6,
   "berry_milk_cow_cap": 10,
   "berry_milk_cow_extra": 4,
-  "berry_herd_mouth_cap": 10,
+  "berry_herd_mouth_cap": 12,
   "berry_animal_buy_day_max": 18,
-  "berry_cow_hard_cap": 8,
+  "berry_cow_hard_cap": 10,
   "late_berry_tomato_cap": 24,
   "land2_sprint_strawberry_min": 24,
   "liquidate_day_min": 25,
@@ -43,5 +45,8 @@
   "lookahead_actions_per_worker_day": 8,
   "lookahead_shadow": 0,
   "lookahead_min_day": 1,
-  "lookahead_max_day": 24
+  "lookahead_max_day": 24,
+  "melon_bridge_cow_day_max": 12,
+  "melon_bridge_cow_cap": 8,
+  "melon_bridge_melon_min": 6
 }

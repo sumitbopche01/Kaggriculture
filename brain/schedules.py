@@ -48,6 +48,15 @@ def berry_land2_strawberry_floor(default: int = 16) -> int:
     return max(8, min(int(default), int(round(float(peak) - 1))))
 
 
+def berry_land2_day(default: int = 10) -> int:
+    """Median day winners unlock plot-3 (ladder elites ≈ 10–11)."""
+    p = prior_for("BERRY")
+    d = p.get("median_land2_day")
+    if d is None:
+        return int(default)
+    return int(round(float(d)))
+
+
 def berry_cow_cap(default: int = 6) -> int:
     """Berry+milk dual maps: winners run ~6–10 cows, not a 2-cow floor."""
     p = prior_for("BERRY")
@@ -68,7 +77,7 @@ def late_dump_day(default: int = 27) -> int:
 
 
 def hire_target_day(day: int, default: int = 5) -> int:
-    """Median winner hires on this day (berry corpus)."""
+    """Median winner roster size on this day (berry corpus)."""
     p = prior_for("BERRY")
     curve = p.get("hire_curve_median") or {}
     v = curve.get(str(int(day)))
