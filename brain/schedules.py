@@ -52,9 +52,11 @@ def berry_cow_cap(default: int = 6) -> int:
     """Berry+milk dual maps: winners run ~6–10 cows, not a 2-cow floor."""
     p = prior_for("BERRY")
     cows = p.get("median_cows_peak")
+    # Never let a soft elite median *lower* a configured cap (H2H regression).
+    floor = int(default)
     if cows is None:
-        return default
-    return max(int(default), min(10, int(round(float(cows)))))
+        return floor
+    return max(floor, min(10, int(round(float(cows)))))
 
 
 def late_dump_day(default: int = 27) -> int:

@@ -114,8 +114,11 @@ OPENING_MARKET = [
     ["HIRE"],
     ["BUY_ANIMAL", "COW", 2],
     ["BUY_ANIMAL", "SHEEP", 2],
-    ["BUY_SEED", "WHEAT", 7],
-    ["BUY_PRODUCT", "WHEAT", 6],
+    # EcoBot / elite ladder: day-0 melon all-in beats wheat-only openers
+    # under shared-market H2H (first melon cash spike ~day 10).
+    ["BUY_SEED", "MELON", 11],
+    ["BUY_SEED", "WHEAT", 6],
+    ["BUY_PRODUCT", "WHEAT", 4],
 ]
 
 DEFAULT_PARAMS: dict[str, int | float] = {
@@ -144,19 +147,20 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "sheep_floor_day_max": 20,
     "sheep_floor": 2,
     "sheep_expand_cap": 4,
-    # Land timing / guards
-    "land_day_min": 6,
+    # Land timing / guards (EcoBot + elite: first plot as early as day 5)
+    "land_day_min": 5,
     "land_day_max": 22,
     "max_quads_for_land": 3,
-    "land2_day_min": 10,
+    "land2_day_min": 9,
     "land2_day_max": 22,
-    "land2_money_min": 4000,
+    "land2_money_min": 3500,
     "land2_empty_max": 4,
     # Replay winners buy plot-3 near day 11 with ~10–12 berries, not 16.
     "land2_strawberry_min": 10,
-    "berry_milk_cow_cap": 8,
+    "berry_milk_cow_cap": 10,
     "berry_milk_cow_extra": 4,
-    "sell_n_pre_dump": 6,
+    "sell_n_pre_dump": 7,
+    "liquidate_day_min": 25,
     # Sell-hold heuristic
     "sell_hold_price_factor": 0.82,
     "sell_hold_days_left_min": 7,  # days_left(day) > 6
@@ -219,8 +223,8 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "milk_herd_base": 2,
     "wool_herd_base": 2,
     # P2: phase system + late shop sprint + extended windows
-    # Replay dump median ~d27; start liquidating a day earlier than before.
-    "liquidate_day_min": 26,
+    # Replay dump median ~d27; EcoBot-style earlier liquidation helps H2H.
+    "liquidate_day_min": 25,
     "engine_replant_day_max": ENGINE_REPLANT_DAY_MAX,
     "liquidity_rescue_day_max": 26,
     "seed_fill_day_max": 22,
