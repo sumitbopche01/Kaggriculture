@@ -68,3 +68,51 @@ def prefer_plant_over_pasture(
     plant_value = marginal * max(0.0, float(tile_ev))
     pasture_option = max(0.0, float(animal_day_ev))
     return plant_value > pasture_option * 2.5
+
+
+def water_risk(
+    *,
+    unwatered: int,
+    at_risk: int,
+    workers: int,
+    hour: int,
+    day_hours: int = 12,
+    path_efficiency: float = 0.55,
+) -> float:
+    """Dry tiles vs remaining crew-hours. 0 = fine; >=1 ≈ cannot clear by dusk."""
+    remaining = max(1, int(day_hours) - int(hour))
+    crew = max(1, int(workers))
+    capacity = max(1.0, crew * remaining * float(path_efficiency))
+    debt = max(int(unwatered), int(at_risk))
+    return float(debt) / capacity
+
+
+def water_stress(
+    *,
+    unwatered: int,
+    at_risk: int,
+    workers: int,
+    hour: int,
+    day_hours: int = 12,
+) -> bool:
+    """True when crew must water before harvest/densify or tiles die overnight."""
+    if int(at_risk) > 0:
+        return True
+    debt = int(unwatered)
+    if debt <= 0:
+        return False
+    return water_risk(
+        unwatered=debt,
+        at_risk=int(at_risk),
+        workers=max(1, int(workers)),
+        hour=int(hour),
+        day_hours=day_hours,
+    ) >= 0.85
+
+
+def crew_live_cap(*, workers: int, mouths: int = 0) -> int:
+    """Max live plant tiles a crew can reliably water each day (pathing tax)."""
+    feeders = max(0, int(mouths) // 3)
+    water_crew = max(1, int(workers) - feeders)
+    # ~5 clears / worker / day after hire lag + travel (see want_hands).
+    return water_crew * 5

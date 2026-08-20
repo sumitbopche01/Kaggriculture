@@ -79,7 +79,15 @@ class TurnPlan:
         """Empty (and plan gap) relative to hour plant slots — one field signal."""
         b = self.budget
         empty = float(b.empty if b is not None else 0)
-        slots = max(1.0, float(b.plantable if b is not None else 0))
+        at_risk = float(b.at_risk if b is not None else 0)
+        workers = max(1.0, float(b.workers if b is not None else 1))
+        # Tiny plantable under water debt used to inflate pressure and push
+        # plant-over-water; floor slots by crew so densify doesn't thrash.
+        slots = max(
+            1.0,
+            float(b.plantable if b is not None else 0),
+            workers if at_risk > 0 else 0.0,
+        )
         pressure = empty / slots
         gap = float(max(self.berry_gap, self.cash_gap))
         if gap > 0:

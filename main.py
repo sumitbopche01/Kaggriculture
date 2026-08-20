@@ -44,6 +44,8 @@ from brain.playbook import (
     primary_cash_crop,
     skip_berry_prep_for_sinks,
 )
+from brain.dynamics import crew_live_cap, water_stress
+from brain.lookahead import rank_projects
 from brain.turn_budget import (
     TurnBudget,
     choose_project,
@@ -244,6 +246,12 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "mouth_cap_2qplus": 14,
     "animal_cash_floor_2qplus": 400,
     "animal_cash_floor_1q": 1200,
+    # 2–5 day capital look-ahead (land vs cow vs seed)
+    "lookahead_days": 3,
+    "lookahead_actions_per_worker_day": 8,
+    "lookahead_shadow": 0,
+    "lookahead_min_day": 1,
+    "lookahead_max_day": 24,
 }
 
 
@@ -1102,6 +1110,26 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
         )
         short = max(0, feed_floor - wheat_have - int(plan["WHEAT"]))
         plan["WHEAT"] += min(leftover, short)
+
+    # Tomato densify only — berry engines keep their plan. Caps the stand to
+    # what the crew can water after wheat + live/planned berries.
+    tom_plan = int(plan.get("TOMATO", 0) or 0)
+    if tom_plan > 0:
+        hands = max(want_hands(s), int(s.get("workers") or 1))
+        clearing = max(
+            8,
+            int(0.5 * crew_live_cap(workers=hands, mouths=mouths_of(s))),
+        )
+        wheat_n = int(plan.get("WHEAT", 0) or 0)
+        berry_n = max(
+            int(plan.get("STRAWBERRY", 0) or 0),
+            int(s["crops"].get("STRAWBERRY", 0) or 0),
+        )
+        room = max(8, clearing - wheat_n - berry_n)
+        have_t = int(s["crops"].get("TOMATO", 0) or 0)
+        if int(s.get("unwatered") or 0) > hands or int(s.get("at_risk") or 0) > 0:
+            room = min(room, have_t)
+        plan["TOMATO"] = min(tom_plan, room)
     return plan
 
 
@@ -1386,14 +1414,64 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
 
 
 def want_hands(s: dict[str, Any]) -> int:
-    """Leaders rehire a full crew every morning. Day 0 stays the 5-hire opening."""
+    """Rehire every morning sized to water debt + herd, not only quads."""
     if s["day"] == 0:
         return 5
+    # Clear dry tiles by dusk with ~55% pathing efficiency (see water_risk).
+    debt = max(int(s.get("unwatered") or 0), int(s.get("at_risk") or 0))
+    live = 0
+    crops = s.get("crops") or {}
+    for c in ("TOMATO", "STRAWBERRY", "CARROT", "MELON", "WHEAT"):
+        live += int(crops.get(c, 0) or 0)
+    water_load = max(debt, live)
+    # Full crew after dawn hire lag ≈ 10 useful hours × 0.55 ≈ 5.5 tiles/worker.
+    cover = (water_load + 4) // 5
+    base = 5
     if s["n_quads"] >= 2 or mouths_of(s) >= 8:
-        return 12
-    if mouths_of(s) >= 1 or berry_ok(s):
-        return 8
-    return 5
+        base = 12
+    elif mouths_of(s) >= 1 or berry_ok(s):
+        base = 8
+    # Feeders share the crew — leave room above pure water cover.
+    need = cover + max(0, mouths_of(s) // 3)
+    return min(MAX_HANDS, max(base, need))
+
+
+def hire_burst_cap(s: dict[str, Any]) -> int:
+    """Dawn hire burst when water debt outruns the default 5."""
+    hour = int(s.get("hour") or 0)
+    if hour > 2:
+        return HIRES_PER_TURN
+    if hire_water_pressure(s):
+        return min(MAX_HANDS, 9)
+    return HIRES_PER_TURN
+
+
+def _hire_budget(s: dict[str, Any], market: list, *, reserve_land: bool) -> int:
+    """Leave slots for land, berries, wheat seeds, and emergency feed."""
+    reserved = 0
+    hour = int(s.get("hour") or 0)
+    # Dawn crew first when true water pressure — skip densify/land reserves.
+    crew_first = hour <= 2 and hire_water_pressure(s)
+    if not crew_first:
+        if reserve_land:
+            reserved += 1
+        if berry_ok(s) and berry_gap(s) > 0:
+            reserved += 1
+        elif (s.get("turn_plan") and int(getattr(s["turn_plan"], "cash_gap", 0) or 0) > 0):
+            reserved += 1
+        elif crop_gap(crop_plan(s), s, _primary_cash(s)) > 0:
+            reserved += 1
+        _, _, wheat_tiles = tile_budget(s)
+        if s["crops"]["WHEAT"] + s["seeds"].get("WHEAT", 0) < wheat_tiles:
+            reserved += 1
+        if _feed_crisis(s):
+            reserved += 1
+        if s["empty"] >= 12 and s["day"] <= 18 and int(s.get("unwatered") or 0) == 0:
+            reserved += 1
+    elif _feed_crisis(s):
+        reserved = 1
+    left = max(0, MARKET_LIMIT - len(market) - reserved)
+    return min(hire_burst_cap(s), left)
 
 
 def shop_demand(shops: list | None) -> dict[str, int]:
@@ -1536,7 +1614,50 @@ def pick_mode(s: dict[str, Any]) -> str:
     return "ENGINE"
 
 
+def field_water_stress(s: dict[str, Any]) -> bool:
+    """Crew–tile risk: dry field outruns remaining hands before dusk."""
+    hour = int(s.get("hour") or 0)
+    workers = max(1, int(s.get("workers") or 1))
+    # Hands clear overnight — size morning risk to the hire target, not roster=1.
+    if hour <= 2:
+        workers = max(workers, min(MAX_HANDS, want_hands(s)))
+    return water_stress(
+        unwatered=int(s.get("unwatered") or 0),
+        at_risk=int(s.get("at_risk") or 0),
+        workers=workers,
+        hour=hour,
+    )
+
+
+def hire_water_pressure(s: dict[str, Any]) -> bool:
+    """Market hire urgency — ignore dawn workers=1 false alarm (hands clear overnight)."""
+    if int(s.get("at_risk") or 0) > 0:
+        return True
+    crops = s.get("crops") or {}
+    ongoing = int(crops.get("TOMATO", 0) or 0) + int(crops.get("STRAWBERRY", 0) or 0)
+    live = ongoing
+    for c in ("CARROT", "MELON", "WHEAT"):
+        live += int(crops.get(c, 0) or 0)
+    if live < 12:
+        return False
+    hour = int(s.get("hour") or 0)
+    # Dense ongoing stands need a dawn burst — wheat filler does not.
+    if hour <= 2 and ongoing >= 20:
+        return True
+    return water_stress(
+        unwatered=max(int(s.get("unwatered") or 0), live),
+        at_risk=int(s.get("at_risk") or 0),
+        workers=MAX_HANDS,
+        hour=max(2, hour),
+    )
+
+
 def cash_waiting(s: dict[str, Any], seeds: dict[str, int] | None = None) -> bool:
+    # Late-day water crisis / at-risk: don't densify over saving tiles.
+    if int(s.get("at_risk") or 0) > 0:
+        return False
+    if int(s.get("hour") or 0) >= 6 and field_water_stress(s):
+        return False
     seeds = seeds if seeds is not None else s["seeds"]
     plan = crop_plan(s)
     if any(
@@ -1637,6 +1758,8 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
     best = None
     hungry = ctx["hungry"]
     fert_ready = ctx.get("fert_ready", 0)
+    stress = bool(ctx.get("water_stress"))
+    live_dry = int(ctx.get("unwatered") or 0)
     for y, row in enumerate(tiles):
         for x, t in enumerate(row):
             if t == "LOCKED" or (x, y) in claimed:
@@ -1659,7 +1782,15 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                         inv_score = 0.25 * float(gap)
                     else:
                         inv_score = -0.15 * float(-gap)
-                    priority = 0
+                    # Ongoing harvest must not outrun dry-tile watering when
+                    # debt exceeds this hour's crew (overnight weed risk).
+                    if (
+                        live_dry > max(1, int(ctx.get("workers") or 1))
+                        or stress
+                    ) and crop in ONGOING:
+                        priority = 1
+                    else:
+                        priority = 0
                     # `candidate` tuple sorts ascending, so negate the score.
                     urgency = -(ev_score + inv_score)
                 elif not t["watered_today"] and t.get("consecutive_unwatered", 0) >= 1:
@@ -1681,11 +1812,14 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                         or cash
                         or not has_wheat
                         or engine
+                        or stress
                     ):
-                        if engine:
-                            # One hour of live yield. Beats plant (priority 1).
+                        if cash or engine or stress:
+                            # Dry cash tiles beat densify plant (priority 1).
                             priority = 0
                             urgency = -max(float(ctx.get("tile_ev") or 0.0), 1.0)
+                            if cash:
+                                urgency -= 1.0
                         elif ctx.get("use_fert"):
                             priority = 2
                         else:
@@ -1696,6 +1830,7 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                     and ctx.get("use_fert")
                     and t.get("fertilized_until_day", -1) < day
                     and hungry == 0
+                    and not stress
                 ):
                     priority = 2
             elif isinstance(t, dict) and t.get("kind") in ("COOP", "PASTURE"):
@@ -1706,7 +1841,7 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                     elif not t.get("fed_today") and has_wheat:
                         priority = 0
                         urgency = -30
-                    elif t.get("fertilizer_available"):
+                    elif t.get("fertilizer_available") and not stress:
                         if hungry == 0 or not has_wheat:
                             priority = 0
                             urgency = -15
@@ -1717,6 +1852,7 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                         and fert_ready == 0
                         and not ctx.get("skip_care")
                         and not ctx.get("fill_board")
+                        and not stress
                     ):
                         priority = 3
                 elif ctx["carried"] and ANIMAL_STRUCT.get(ctx["carried"]) == t.get(
@@ -1724,7 +1860,7 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                 ):
                     priority = 2
             elif isinstance(t, dict) and t.get("kind") == "WEED":
-                if hungry == 0:
+                if hungry == 0 and not stress:
                     if ctx.get("cash_waiting"):
                         priority = 1
                         urgency = 3
@@ -1734,12 +1870,16 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
             elif t is None:
                 waiting_plant = ctx.get("cash_waiting") or ctx.get("wheat_waiting")
                 waiting_berry = ctx.get("berry_waiting")
-                if hungry == 0 and has_seeds and (waiting_plant or waiting_berry):
+                if (
+                    hungry == 0
+                    and has_seeds
+                    and (waiting_plant or waiting_berry)
+                    and not stress
+                ):
                     tile_ev = float(ctx.get("tile_ev") or 0.0)
                     days = max(1, int(ctx.get("productive_days") or 1))
                     # After live plants are watered this hour, leftover seeds
                     # share priority 0 with water (post-land fill).
-                    live_dry = int(ctx.get("unwatered") or 0)
                     if live_dry == 0 and (
                         ctx.get("plant_sprint")
                         or int(ctx.get("empty") or 0) > int(ctx.get("workers") or 0)
@@ -1750,10 +1890,12 @@ def nearest_job(tiles, fx, fy, day, claimed, has_seeds, has_fertilizer, has_whea
                         priority = 1
                         urgency = -(max(tile_ev, 1.0) * days)
                 elif (
-                    ctx.get("need_pasture") or ctx.get("need_coop")
-                ) and not waiting_plant:
+                    (ctx.get("need_pasture") or ctx.get("need_coop"))
+                    and not waiting_plant
+                    and not stress
+                ):
                     priority = 1
-                elif hungry == 0 and has_seeds:
+                elif hungry == 0 and has_seeds and not stress:
                     priority = 1 if waiting_plant else 4
             if priority is None:
                 continue
@@ -1822,6 +1964,23 @@ def action_for(tiles, x, y, day, seeds, claimed, s, inv, ctx):
         return ["DIG"], seeds
 
     if isinstance(tile, dict) and tile.get("kind") == "PLANT":
+        at_risk_tile = tile.get("consecutive_unwatered", 0) >= 1
+        dry = not tile["watered_today"] and not is_feeder
+        # Water before harvest when dry cash/risk — yield skim must not kill tiles.
+        if dry and (
+            at_risk_tile
+            or ctx.get("water_stress")
+            or tile.get("crop") in CASH_CROPS
+            or int(ctx.get("unwatered") or 0) > max(1, int(ctx.get("workers") or 1))
+        ):
+            claimed.add((x, y))
+            s["unwatered"] = max(0, int(s.get("unwatered") or 0) - 1)
+            ctx["unwatered"] = s["unwatered"]
+            if at_risk_tile:
+                s["at_risk"] = max(0, int(s.get("at_risk") or 0) - 1)
+                ctx["at_risk"] = s["at_risk"]
+            ctx["water_stress"] = field_water_stress(s)
+            return ["WATER"], seeds
         if crop_ready(tile, day, ctx.get("early_wheat", False)):
             crop = tile.get("crop")
             # Track all harvested crops for in-turn shed projection
@@ -1846,12 +2005,15 @@ def action_for(tiles, x, y, day, seeds, claimed, s, inv, ctx):
             and tile.get("crop") in CASH_CROPS
             and tile.get("fertilized_until_day", -1) < day
             and not is_feeder
+            and not ctx.get("water_stress")
         ):
             claimed.add((x, y))
             return ["FERTILIZE"], seeds
-        at_risk_tile = tile.get("consecutive_unwatered", 0) >= 1
-        if not tile["watered_today"] and not is_feeder:
+        if dry:
             claimed.add((x, y))
+            s["unwatered"] = max(0, int(s.get("unwatered") or 0) - 1)
+            ctx["unwatered"] = s["unwatered"]
+            ctx["water_stress"] = field_water_stress(s)
             return ["WATER"], seeds
 
     if isinstance(tile, dict) and tile.get("kind") in ("COOP", "PASTURE"):
@@ -2284,6 +2446,36 @@ def _cow_project_score(s: dict[str, Any]) -> float:
     return per_day * max(1, int(budget.productive_days))
 
 
+def _lookahead_project_scores(
+    s: dict[str, Any],
+    afford: int,
+    *,
+    can_land: bool,
+    can_cow: bool,
+    can_seed: bool,
+    n_seeds: int,
+) -> dict[str, float] | None:
+    """Bucket look-ahead scores, or None outside the active day window / on error."""
+    day = int(s.get("day") or 0)
+    if day < int(PARAMS["lookahead_min_day"]) or day > int(PARAMS["lookahead_max_day"]):
+        return None
+    primary = _primary_cash(s) or "STRAWBERRY"
+    try:
+        return rank_projects(
+            s,
+            days=int(PARAMS["lookahead_days"]),
+            actions_per_worker_day=int(PARAMS["lookahead_actions_per_worker_day"]),
+            primary=primary,
+            n_seeds=max(0, int(n_seeds)),
+            can_land=can_land,
+            can_cow=can_cow,
+            can_seed=can_seed,
+            land_cost_ok=afford >= LAND_COST[min(s["n_quads"] - 1, 2)],
+        )
+    except Exception:
+        return None
+
+
 def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     below_floor = s["cows"] < 2 or s["sheep"] < 2
     if s["hour"] != 0 and not below_floor:
@@ -2552,28 +2744,22 @@ def _coalesce_seed_buys(market: list) -> list:
     return merged
 
 
-def _hire_budget(s: dict[str, Any], market: list, *, reserve_land: bool) -> int:
-    """Leave slots for land, berries, wheat seeds, and emergency feed."""
-    reserved = 0
-    if reserve_land:
-        reserved += 1
-    if berry_ok(s) and berry_gap(s) > 0:
-        reserved += 1
-    elif (s.get("turn_plan") and int(getattr(s["turn_plan"], "cash_gap", 0) or 0) > 0):
-        reserved += 1
-    elif crop_gap(crop_plan(s), s, _primary_cash(s)) > 0:
-        reserved += 1
-    _, _, wheat_tiles = tile_budget(s)
-    if s["crops"]["WHEAT"] + s["seeds"].get("WHEAT", 0) < wheat_tiles:
-        reserved += 1
-    if _feed_crisis(s):
-        reserved += 1
-    # When the board is still very sparse, spending the full 5 hire slots
-    # often crowds out seed buys. Reserve one extra slot for planting.
-    if s["empty"] >= 12 and s["day"] <= 18:
-        reserved += 1
-    left = max(0, MARKET_LIMIT - len(market) - reserved)
-    return min(HIRES_PER_TURN, left)
+def _crew_hire_n(
+    s: dict[str, Any],
+    market: list,
+    *,
+    reserve_land: bool,
+    hire_cap: int | None = None,
+) -> int:
+    """Hire count this market hour — phase cap yields to water-debt burst."""
+    budget = _hire_budget(s, market, reserve_land=reserve_land)
+    debt = int(s.get("unwatered") or 0)
+    workers = max(1, int(s.get("workers") or 1))
+    if debt > workers:
+        return budget  # ignore phase hire_cap while drowning
+    if hire_cap is None:
+        return budget
+    return min(budget, int(hire_cap))
 
 
 def _pack_market(market: list, limit: int = MARKET_LIMIT) -> list:
@@ -2649,19 +2835,38 @@ def market_for(s: dict[str, Any], mode: str) -> list:
     if tp.market_route == "late_sprint" and (
         s2["empty"] >= 8 or berry_gap_start > 0 or tp.cash_gap > 0
     ):
-        hire_cap = tp.profile.hire_cap or HIRES_PER_TURN
-        hire_n = min(_hire_budget(s2, market, reserve_land=False), hire_cap)
+        hire_n = _crew_hire_n(
+            s2, market, reserve_land=False, hire_cap=tp.profile.hire_cap
+        )
         afford = _hire_up_to(market, afford, s2, hire_n)
         land_npv = _land_project_npv(s2, afford)
         cow_ev = _cow_project_score(s2) if not tp.defer_animals else 0.0
-        seed_ev, _ = _seed_project_score(s2)
+        seed_ev, n_seeds = _seed_project_score(s2)
+        can_land = land_npv > 0
+        can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
+        can_seed = seed_ev > 0
+        la = _lookahead_project_scores(
+            s2,
+            afford,
+            can_land=can_land,
+            can_cow=can_cow,
+            can_seed=can_seed,
+            n_seeds=n_seeds,
+        )
+        if la is not None and int(PARAMS["lookahead_shadow"]) != 1:
+            if la.get("land", 0.0) > 0 or la.get("cow", 0.0) > 0 or la.get("seed", 0.0) > 0:
+                land_npv = float(la.get("land", 0.0))
+                cow_ev = float(la.get("cow", 0.0)) if not tp.defer_animals else 0.0
+                seed_ev = float(la.get("seed", 0.0))
+                can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
+                can_seed = seed_ev > 0
         pick = choose_project(
             land_npv=land_npv,
-            can_land=land_npv > 0,
+            can_land=can_land,
             cow_ev=cow_ev,
-            can_cow=cow_ev > 0 and afford >= ANIMAL_COST["COW"],
+            can_cow=can_cow,
             seed_ev=seed_ev,
-            can_seed=seed_ev > 0,
+            can_seed=can_seed,
         )
         if pick == "land":
             afford = _maybe_buy_land(market, afford, s2)
@@ -2679,10 +2884,11 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         return _pack_market(market)
 
     if tp.market_route == "berry_prep":
-        hire_cap = tp.profile.hire_cap or HIRES_PER_TURN
-        hire_n = min(
-            _hire_budget(s2, market, reserve_land=need_land(s2)),
-            hire_cap,
+        hire_n = _crew_hire_n(
+            s2,
+            market,
+            reserve_land=need_land(s2),
+            hire_cap=tp.profile.hire_cap,
         )
         afford = _hire_up_to(market, afford, s2, hire_n)
         afford = _buy_berry_prep_seeds(market, afford, s2, s2["seeds"])
@@ -2690,12 +2896,12 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         return _pack_market(market)
 
     # Hire first so day_plantable reflects the crew we can afford.
-    hire_n = _hire_budget(s2, market, reserve_land=need_land(s2))
+    hire_n = _crew_hire_n(s2, market, reserve_land=need_land(s2))
     afford = _hire_up_to(market, afford, s2, hire_n)
 
     land_npv = _land_project_npv(s2, afford)
     cow_ev = 0.0 if tp.defer_animals else _cow_project_score(s2)
-    seed_ev, _ = _seed_project_score(s2)
+    seed_ev, n_seeds = _seed_project_score(s2)
     # Pizza / milk stack: mouths outrank tomato seed stockpiles.
     if (
         current_engine(s2) == "MILK"
@@ -2708,13 +2914,40 @@ def market_for(s: dict[str, Any], mode: str) -> list:
     can_land = land_npv > 0 or (s2["n_quads"] == 1 and _will_buy_land(s2, afford))
     if s2["n_quads"] == 1 and can_land and land_npv <= 0:
         land_npv = 1.0
+    can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
+    can_seed = seed_ev > 0
+
+    # 2–5 day bucket look-ahead for capital choice (shadow or live).
+    la = _lookahead_project_scores(
+        s2,
+        afford,
+        can_land=can_land,
+        can_cow=can_cow and not tp.defer_animals,
+        can_seed=can_seed,
+        n_seeds=n_seeds,
+    )
+    shadow = int(PARAMS["lookahead_shadow"]) == 1
+    if la is not None and not shadow:
+        # Live: look-ahead $ deltas drive the chooser; closed-form is fallback
+        # only when every project scores ≤ 0.
+        if la.get("land", 0.0) > 0 or la.get("cow", 0.0) > 0 or la.get("seed", 0.0) > 0:
+            land_npv = float(la.get("land", 0.0))
+            cow_ev = float(la.get("cow", 0.0)) if not tp.defer_animals else 0.0
+            seed_ev = float(la.get("seed", 0.0))
+            # Soft 1→2 unlock: keep land eligible when gates say buy.
+            if s2["n_quads"] == 1 and can_land and land_npv <= 0:
+                land_npv = 1.0
+            can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
+            can_seed = seed_ev > 0
+    # Shadow mode: still execute closed-form; look-ahead is computed for parity.
+
     pick = choose_project(
         land_npv=land_npv,
         can_land=can_land,
         cow_ev=cow_ev,
-        can_cow=cow_ev > 0 and afford >= ANIMAL_COST["COW"],
+        can_cow=can_cow,
         seed_ev=seed_ev,
-        can_seed=seed_ev > 0,
+        can_seed=can_seed,
     )
 
     if pick == "land":
@@ -2781,6 +3014,7 @@ def agent(obs: dict[str, Any]) -> dict[str, Any]:
         "hungry": s["hungry"],
         "fert_ready": s["fert_ready"],
         "unwatered": s["unwatered"],
+        "water_stress": field_water_stress(s),
         "carried": None,
         "has_wheat": False,
         "early_wheat": early_wheat,

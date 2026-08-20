@@ -27,5 +27,10 @@
   "wheat_engine_day_max": 24,
   "wheat_filler_day_max": 20,
   "wheat_min_tiles": 6,
-  "wheat_no_mouth_tiles": 4
+  "wheat_no_mouth_tiles": 4,
+  "lookahead_days": 3,
+  "lookahead_actions_per_worker_day": 8,
+  "lookahead_shadow": 0,
+  "lookahead_min_day": 1,
+  "lookahead_max_day": 24
 }

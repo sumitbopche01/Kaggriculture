@@ -66,6 +66,41 @@ TUNE_SEEDS_30 = [
     2063069147,
     195016893,
 ]
+# Extra 30: named hard/analysis maps from repo + prior chat evals, then
+# unused small ints for shop-path diversity.
+TUNE_SEEDS_EXTRA_30 = [
+    761083594,  # playbook: early cow waste
+    796605284,  # v2 pizza/bakery analysis
+    1012421698,
+    1060428368,
+    1194218470,
+    1594992029,
+    1763244299,
+    1941500822,
+    456398262,
+    49090797,
+    529524938,
+    628776362,
+    801568323,
+    838377008,
+    965622909,
+    232697454,
+    25138847,
+    438977009,
+    94031431,
+    1584566076,
+    3,
+    4,
+    5,
+    6,
+    8,
+    9,
+    10,
+    11,
+    12,
+    14,
+]
+TUNE_SEEDS_60 = TUNE_SEEDS_30 + TUNE_SEEDS_EXTRA_30
 
 
 def run_vs_starter(seed: int, *, episode_steps: int = 720) -> tuple[int, int]:
@@ -110,11 +145,21 @@ def evaluate_seeds(
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--episodeSteps", type=int, default=720)
-    p.add_argument("--seedSet", type=str, default="tune30", choices=["mean15", "tune30"])
-    p.add_argument("--seedCount", type=int, default=30)
+    p.add_argument(
+        "--seedSet",
+        type=str,
+        default="tune60",
+        choices=["mean15", "tune30", "tune60"],
+    )
+    p.add_argument("--seedCount", type=int, default=60)
     args = p.parse_args()
 
-    seeds_src = MEAN_SEEDS_15 if args.seedSet == "mean15" else TUNE_SEEDS_30
+    if args.seedSet == "mean15":
+        seeds_src = MEAN_SEEDS_15
+    elif args.seedSet == "tune30":
+        seeds_src = TUNE_SEEDS_30
+    else:
+        seeds_src = TUNE_SEEDS_60
     seeds = seeds_src[: args.seedCount]
     mean, rows = evaluate_seeds(seeds, episode_steps=args.episodeSteps)
     for seed, us, starter in rows:
