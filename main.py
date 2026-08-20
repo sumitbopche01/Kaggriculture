@@ -128,9 +128,12 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "late_wheat_seed_buffer_day_min": 16,
     "late_wheat_seed_buffer": 2,
     # Melon filler (only when berries exist)
-    "melon_leftover_min": 8,
-    "melon_n_quads_min": 3,
+    # Replay winners open ~5–12 melon seeds on day 0; gate was n_quads>=3
+    # so bakery/yarn maps sat on wheat-only until FM and never filled board.
+    "melon_leftover_min": 4,
+    "melon_n_quads_min": 1,
     "melon_day_max": 16,
+    "melon_cap": 12,
     # Herd ramp gates
     "cow_day_max": 24,
     "cow_milk_px_min": 80,
@@ -147,11 +150,15 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "land_day_min": 6,
     "land_day_max": 22,
     "max_quads_for_land": 3,
-    "land2_day_min": 11,
+    "land2_day_min": 10,
     "land2_day_max": 22,
     "land2_money_min": 4000,
     "land2_empty_max": 4,
-    "land2_strawberry_min": 16,
+    # Replay winners buy plot-3 near day 11 with ~10–12 berries, not 16.
+    "land2_strawberry_min": 10,
+    "berry_milk_cow_cap": 8,
+    "berry_milk_cow_extra": 4,
+    "sell_n_pre_dump": 6,
     # Sell-hold heuristic
     "sell_hold_price_factor": 0.82,
     "sell_hold_days_left_min": 7,  # days_left(day) > 6
@@ -212,10 +219,10 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "demand_cap_step_berry": 4,
     "demand_cap_step_crop": 2,
     "milk_herd_base": 2,
-    "berry_milk_cow_cap": 6,
     "wool_herd_base": 2,
     # P2: phase system + late shop sprint + extended windows
-    "liquidate_day_min": 28,
+    # Replay dump median ~d27; start liquidating a day earlier than before.
+    "liquidate_day_min": 26,
     "engine_replant_day_max": ENGINE_REPLANT_DAY_MAX,
     "liquidity_rescue_day_max": 26,
     "seed_fill_day_max": 22,
@@ -1097,6 +1104,17 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
         plan[primary] = int(plan.get(primary, 0) or 0) + extra
         leftover -= extra
 
+    # Melon filler before berry demand — steal day-0 melon schedules from
+    # strong replays. Never after a berry shop opens (glut + water fight).
+    if (
+        leftover >= int(PARAMS["melon_leftover_min"])
+        and int(s["day"]) <= int(PARAMS["melon_day_max"])
+        and int(s["n_quads"]) >= int(PARAMS["melon_n_quads_min"])
+        and int(demand.get("STRAWBERRY", 0) or 0) == 0
+        and live_ev(s, "MELON") > live_ev(s, "WHEAT")
+    ):
+        take("MELON", min(int(PARAMS["melon_cap"]), leftover))
+
     # Feed leftover, never a second cash crop. Berry maps leave the hole
     # empty rather than flooding wheat over strawberries; only top up
     # wheat when the planted+seeded feed floor is still short of plan.
@@ -1204,7 +1222,9 @@ def want_sheep(s: dict[str, Any]) -> int:
     # No wool demand → don't expand (pasture/water steal).
     if wool_d <= 0:
         return s["sheep"]
-    if s["n_quads"] == 1:
+    # Yarn-stacked 1-quad towns still need wool mouths; waiting for land2
+    # left seed 99 on 2 sheep while two yarn stores printed demand.
+    if s["n_quads"] == 1 and wool_d < 2:
         return s["sheep"]
     if not herd_can_expand(s):
         return s["sheep"]
@@ -1316,8 +1336,12 @@ def need_land(s: dict[str, Any]) -> bool:
         # Plot 3 is a packed-board buy. Do not inherit late-ramp empty relax.
         if s["empty"] > int(PARAMS["land2_empty_max"]):
             return False
-        if berry_ok(s) and s["crops"]["STRAWBERRY"] < PARAMS["land2_strawberry_min"]:
-            return False
+        if berry_ok(s):
+            from brain.schedules import berry_land2_strawberry_floor
+
+            berry_min = berry_land2_strawberry_floor(int(PARAMS["land2_strawberry_min"]))
+            if s["crops"]["STRAWBERRY"] < berry_min:
+                return False
         return True
     return False
 

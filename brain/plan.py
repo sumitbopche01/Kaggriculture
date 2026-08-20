@@ -282,6 +282,11 @@ def compute_sell_n(
     if plan.phase == "ENDGAME":
         sell_n = max(sell_n, prof.sell_n_endgame)
 
+    # Replay late-sell share ~36%; start dumping before LIQUIDATE.
+    dump_day = int(params.get("liquidate_day_min", 26))
+    if mode != "LIQUIDATE" and int(s.get("day", 0)) >= max(22, dump_day - 4):
+        sell_n = max(sell_n, int(params.get("sell_n_pre_dump", 6)))
+
     if prof.spike_sell_bump and plan.phase == "SPIKE":
         berry_sink = int(s.get("berry_sink", 0) or 0)
         if not strategy_spike_sell_bump(

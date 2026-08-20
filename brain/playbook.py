@@ -285,16 +285,25 @@ def cow_target(s: dict[str, Any], params: dict[str, int | float]) -> int:
         return cows
     floor = int(params.get("cow_floor", 2)) if day <= int(params.get("cow_floor_day_max", 20)) else 0
     if engine_of(s) != "MILK":
-        # Ice cream / smoothie list MILK. Two+ of those on a 2-quad berry
-        # map justify a garnish herd, not a pizza-scale one (seed 42).
+        # Ice cream / smoothie list MILK. Soft berry maps stalled at 2 cows;
+        # external winners run ~6–10. One dual milk shop on 2q+ is enough
+        # to start the garnish; two+ scales toward the schedule cap.
         dual = shop_family_count(s.get("shops"), MILK_SHOPS & BERRY_SHOPS)
+        milk_any = shop_family_count(s.get("shops"), MILK_SHOPS)
         n_quads = int(s.get("n_quads", 1))
-        if dual >= 2 and n_quads >= 2:
-            extra = 2 * min(dual - 1, 2)
-            cap = int(params.get("berry_milk_cow_cap", 6))
+        if n_quads >= 2 and (dual >= 1 or milk_any >= 1):
+            from brain.schedules import berry_cow_cap
+
+            cap = berry_cow_cap(int(params.get("berry_milk_cow_cap", 6)))
             mouth_cap = int(params.get("mouth_cap_2qplus", 14))
             other = int(s.get("sheep") or 0) + int(s.get("geese") or 0)
             cap = min(cap, max(0, mouth_cap - other))
+            if dual >= 2:
+                extra = 2 * min(dual - 1, 3)
+            elif dual >= 1 or milk_any >= 1:
+                extra = int(params.get("berry_milk_cow_extra", 4))
+            else:
+                extra = 0
             return min(cap, max(floor, floor + extra))
         return max(cows, floor)
     sink = milk_sink_n(s)
