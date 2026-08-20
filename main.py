@@ -46,6 +46,8 @@ from brain.playbook import (
 )
 from brain.dynamics import crew_live_cap, water_stress
 from brain.lookahead import rank_projects
+from brain.market import keep_qty as market_keep_qty
+from brain.market import market_inventory, sale_score
 from brain.turn_budget import (
     TurnBudget,
     choose_project,
@@ -2585,37 +2587,24 @@ def _keep_fert(s: dict[str, Any]) -> int:
 
 
 def _sell_score(s: dict[str, Any], item: str, n: int) -> int:
-    price = px(s, item)
-    if price_spike(s, item):
-        return n * price
-    # Winners liquidate strawberries aggressively once the berry-shop mix is
-    # strong (multiple berry sinks open). Don't let the generic hold heuristic
-    # block cash-out in that midgame window.
-    if item == "STRAWBERRY" and s.get("berry_sink", 0) >= 2:
-        return n * price
-    if (
-        item in ("STRAWBERRY", "MELON", "MILK", "WOOL")
-        and days_left(s["day"]) >= PARAMS["sell_hold_days_left_min"]
-    ):
-        hist = float(s.get("price_ma", {}).get(item, price) or price)
-        if hist > 0 and price < hist * PARAMS["sell_hold_price_factor"]:
-            # If the market is moving up (positive delta), sell instead of
-            # holding through a likely bounce.
-            delta = int(s.get("delta", {}).get(item, 0) or 0)
-            days_left_v = days_left(s["day"])
-            if not (delta > 0 and days_left_v <= PARAMS["sell_hold_days_left_min"] + 3):
-                threshold = hist * float(PARAMS["sell_hold_price_factor"])
-                ratio = (price / threshold) if threshold > 0 else 0.0
-                hold_cutoff = 0.85
-                if ratio < hold_cutoff:
-                    return 0
-                # Near-threshold smoothing: allow selling but with a reduced
-                # score so it only triggers when we're close to the hold boundary.
-                t = (ratio - hold_cutoff) / max(1e-9, (1.0 - hold_cutoff))
-                t = max(0.0, min(1.0, t))
-                scale = 0.15 + 0.85 * t
-                return int(n * price * scale)
-    return n * price
+    """Rank a sell lot via inventory–price surface (not spike-only)."""
+    price = float(px(s, item))
+    left = days_left(s["day"])
+    liquidate = (s.get("turn_plan") and s["turn_plan"].mode == "LIQUIDATE") or left <= 2
+    # Strong berry-shop mix: still cash out aggressively (legacy winner cue).
+    berry_force = item == "STRAWBERRY" and int(s.get("berry_sink", 0) or 0) >= 2
+    return sale_score(
+        item=item,
+        n=n,
+        live_px=price,
+        inventory=market_inventory(s, item),
+        demand=s.get("demand") or {},
+        days_left=left,
+        price_ma=float((s.get("price_ma") or {}).get(item, 0) or 0) or None,
+        spiked=price_spike(s, item) or berry_force,
+        liquidate=bool(liquidate) or berry_force,
+        momentum=price_momentum(s, item),
+    )
 
 
 def _sell_goods(
@@ -2623,28 +2612,32 @@ def _sell_goods(
 ) -> int:
     proceeds = 0
     keep_fert = _keep_fert(s)
-    # Inventory floor: keep enough inventory to match the harvest model's
-    # near-term target, scaled by liquidation capacity (`max_actions`).
     plan = crop_plan(s)
     sell_scale = max_actions / 3.0
+    left = days_left(s["day"])
+    liquidate = (s.get("turn_plan") and s["turn_plan"].mode == "LIQUIDATE") or left <= 2
+    demand = s.get("demand") or {}
+    price_ma = s.get("price_ma") or {}
     inv_keep: dict[str, int] = {}
     for c in CASH_CROPS:
         base = max(2, min(10, int(plan.get(c, 0)) // 3))
-        keep = int(round(base * sell_scale))
-        # Make the keep-floor adaptive, but only when `price_ma` exists.
-        # (If price_ma is missing we avoid guessing and keep the original floor.)
-        price = float(px(s, c))
-        price_ma = s.get("price_ma") or {}
-        hist = float(price_ma.get(c, 0) or 0)
-        if hist > 0:
-            threshold = hist * float(PARAMS["sell_hold_price_factor"])
-            ratio = (price / threshold) if threshold > 0 else 1.0
-            sell_pressure = max(0.0, min(1.0, (ratio - 1.0) / 0.5))  # 1.0->0, 1.5+->1
-        else:
-            sell_pressure = 0.0
+        base_keep = int(round(base * sell_scale))
         ongoing_mult = 1.15 if c in ONGOING else 1.0
-        keep = int(round(keep * ongoing_mult * (1.0 - 0.25 * sell_pressure)))
-        inv_keep[c] = max(1, min(12, keep))
+        base_keep = int(round(base_keep * ongoing_mult))
+        live = float(px(s, c))
+        hist = float(price_ma.get(c, 0) or 0) or None
+        inv_keep[c] = market_keep_qty(
+            item=c,
+            stock=int(shed.get(c, 0) or 0),
+            base_keep=base_keep,
+            live_px=live,
+            inventory=market_inventory(s, c),
+            demand=demand,
+            days_left=left,
+            price_ma=hist,
+            spiked=price_spike(s, c),
+            liquidate=bool(liquidate),
+        )
     ranked: list[tuple[int, str, int]] = []
     for item in (
         "FERTILIZER",
@@ -2661,11 +2654,7 @@ def _sell_goods(
         if n > 0:
             score = _sell_score(s, item, n)
             if score > 0:
-                # Stock-like tilt: if price is trending up, slightly
-                # prioritize liquidation earlier. Bound adjustment to
-                # prevent overreacting to noisy deltas.
-                momentum = price_momentum(s, item)
-                ranked.append((int(score * momentum), item, n))
+                ranked.append((score, item, n))
     ranked.sort(reverse=True)
     for _, item, n in ranked[:max_actions]:
         market.append(["SELL", item, n])

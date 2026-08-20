@@ -6,9 +6,10 @@ tables, mark-to-market wealth. Used by market_for to rank capital projects.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
+
+from brain.market import MARKET_I0, MARKET_PARAMS, market_price
 
 ProjectKind = Literal["land", "cow", "seed", "hold"]
 
@@ -22,128 +23,12 @@ SEED_COST = {
     "STRAWBERRY": 100,
     "MELON": 80,
 }
-MARKET_I0 = 10000
-PRICE_FLOOR = 1
-HINGE_GAIN = 8.0
-MARKET_PARAMS: dict[str, dict[str, Any]] = {
-    "WHEAT": {
-        "base": 25,
-        "I0": MARKET_I0,
-        "T": 400,
-        "below_func": "sqrt",
-        "below_target": 0.80,
-        "above_func": "log",
-        "above_target": 0.20,
-    },
-    "CARROT": {
-        "base": 35,
-        "I0": MARKET_I0,
-        "T": 450,
-        "below_func": "hinge",
-        "below_target": 1.00,
-        "above_func": "sqrt",
-        "above_target": 0.70,
-    },
-    "TOMATO": {
-        "base": 60,
-        "I0": MARKET_I0,
-        "T": 200,
-        "below_func": "hinge",
-        "below_target": 0.40,
-        "above_func": "sqrt",
-        "above_target": 0.60,
-    },
-    "STRAWBERRY": {
-        "base": 120,
-        "I0": MARKET_I0,
-        "T": 100,
-        "below_func": "sqrt",
-        "below_target": 0.70,
-        "above_func": "linear",
-        "above_target": 1.60,
-    },
-    "MELON": {
-        "base": 250,
-        "I0": MARKET_I0,
-        "T": 300,
-        "below_func": "log",
-        "below_target": 0.20,
-        "above_func": "sq",
-        "above_target": 3.60,
-    },
-    "EGG": {
-        "base": 50,
-        "I0": MARKET_I0,
-        "T": 332,
-        "below_func": "hinge",
-        "below_target": 0.40,
-        "above_func": "log",
-        "above_target": 0.20,
-    },
-    "MILK": {
-        "base": 160,
-        "I0": MARKET_I0,
-        "T": 122,
-        "below_func": "sqrt",
-        "below_target": 0.60,
-        "above_func": "linear",
-        "above_target": 1.60,
-    },
-    "WOOL": {
-        "base": 200,
-        "I0": MARKET_I0,
-        "T": 105,
-        "below_func": "log",
-        "below_target": 0.20,
-        "above_func": "sq",
-        "above_target": 3.20,
-    },
-}
 
 # Steady production per day once mature (env interval inverted).
 ONGOING_YIELD_PER_DAY = {"TOMATO": 1.0, "STRAWBERRY": 0.5}
 ANIMAL_YIELD_PER_DAY = {"COW": 0.5, "SHEEP": 1.0 / 3.0, "GOOSE": 1.0}
 ANIMAL_PRODUCT = {"COW": "MILK", "SHEEP": "WOOL", "GOOSE": "EGG"}
 CASH_CROPS = ("STRAWBERRY", "TOMATO", "CARROT", "MELON")
-
-
-def _shape(func: str, x: float, T: float | None = None) -> float:
-    x = max(0.0, float(x))
-    if func == "linear":
-        return x
-    if func == "sq":
-        return x * x
-    if func == "sqrt":
-        return math.sqrt(x)
-    if func == "log":
-        return math.log(1.0 + x)
-    if func == "log10":
-        return math.log10(1.0 + x)
-    if func == "hinge":
-        if not T or T <= 0:
-            return x
-        u = x / T
-        return u + HINGE_GAIN * max(0.0, u - 1.0) ** 2
-    return x
-
-
-def market_price(item: str, inventory: int) -> int:
-    p = MARKET_PARAMS.get(item)
-    if not p:
-        return PRICE_FLOOR
-    base = float(p["base"])
-    i0 = float(p["I0"])
-    t = float(p["T"])
-    inv = float(inventory)
-    if inv < i0:
-        f = str(p["below_func"])
-        amp = float(p["below_target"]) * base / _shape(f, t, t)
-        price = base + amp * _shape(f, i0 - inv, t)
-    else:
-        f = str(p["above_func"])
-        amp = float(p["above_target"]) * base / _shape(f, t, t)
-        price = base - amp * _shape(f, inv - i0, t)
-    return max(PRICE_FLOOR, int(round(price)))
 
 
 @dataclass
