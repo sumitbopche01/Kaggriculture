@@ -126,15 +126,22 @@ def primary_cash_crop(
 
     Whoever opened first keeps the engine. Early ice cream / farmers
     market stays strawberries even after pizza. Two pizzas before any
-    berry shop stay tomatoes even after a late smoothie.
+    berry shop stay tomatoes even after a late smoothie — unless berry
+    demand catches up (late-berry trap on pizza-first maps).
     """
     d = demand or {}
     tomato_ok = int(d.get("TOMATO", 0)) >= 1 and viable.get("TOMATO", False)
     berry_demand = int(d.get("STRAWBERRY", 0)) >= 1
     berry_ok = berry_demand and viable.get("STRAWBERRY", False)
     carrot_ok = int(d.get("CARROT", 0)) >= 1 and viable.get("CARROT", False)
+    berry_n = int(d.get("STRAWBERRY", 0) or 0)
+    tomato_n = int(d.get("TOMATO", 0) or 0)
     # Glut must not demote the opener to pet-cafe carrots.
     if berry_demand and berry_opened_first(first_berry_day, first_milk_day):
+        return "STRAWBERRY"
+    # Pizza opened first, but stacked berry sinks should reclaim the engine
+    # (seeds 195016893 / 21 sat on tomatoes after brunch/smoothie arrived).
+    if berry_ok and berry_n >= max(2, tomato_n):
         return "STRAWBERRY"
     if tomato_ok and int(milk_n) >= 2:
         return "TOMATO"
@@ -304,7 +311,8 @@ def cow_target(s: dict[str, Any], params: dict[str, int | float]) -> int:
                 extra = int(params.get("berry_milk_cow_extra", 4))
             else:
                 extra = 0
-            return min(cap, max(floor, floor + extra))
+            hard = int(params.get("berry_cow_hard_cap", 8))
+            return min(cap, hard, max(floor, floor + extra))
         return max(cows, floor)
     sink = milk_sink_n(s)
     if sink <= 0:

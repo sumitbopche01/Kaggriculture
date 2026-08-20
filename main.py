@@ -159,6 +159,11 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "land2_strawberry_min": 10,
     "berry_milk_cow_cap": 10,
     "berry_milk_cow_extra": 4,
+    "berry_herd_mouth_cap": 10,
+    "berry_animal_buy_day_max": 18,
+    "berry_cow_hard_cap": 8,
+    "late_berry_tomato_cap": 24,
+    "land2_sprint_strawberry_min": 24,
     "sell_n_pre_dump": 7,
     "liquidate_day_min": 25,
     # Sell-hold heuristic
@@ -1148,6 +1153,14 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
             int(s["crops"].get("STRAWBERRY", 0) or 0),
         )
         room = max(8, clearing - wheat_n - berry_n)
+        # Waiting on the first berry shop: keep a modest tomato printer, leave
+        # empty for the strawberry pivot (do not cap after berries exist).
+        if (
+            berry_sink(s) == 0
+            and milk_sink(s) >= 1
+            and int(s.get("day", 0)) >= int(PARAMS.get("berry_prep_day_min", 11))
+        ):
+            room = min(room, int(PARAMS.get("late_berry_tomato_cap", 12)))
         have_t = int(s["crops"].get("TOMATO", 0) or 0)
         if int(s.get("unwatered") or 0) > hands or int(s.get("at_risk") or 0) > 0:
             room = min(room, have_t)
@@ -1331,6 +1344,12 @@ def need_land(s: dict[str, Any]) -> bool:
         if strat not in ("EARLY_BERRY", "LAND_SPRINT"):
             if berry_sink(s) > 0 or milk_sink(s) >= 1:
                 return False
+        # LAND_SPRINT is mainly a 1→2 densify cue. Plot-3 only when the
+        # berry stand is already fat (seed 21 bought hollow plot-3 at ~6 berries).
+        if strat == "LAND_SPRINT" and int(s["crops"].get("STRAWBERRY", 0) or 0) < int(
+            PARAMS.get("land2_sprint_strawberry_min", 24)
+        ):
+            return False
         if s["day"] < PARAMS["land2_day_min"]:
             return False
         if int(s["money"]) < PARAMS["land2_money_min"]:
@@ -1338,7 +1357,7 @@ def need_land(s: dict[str, Any]) -> bool:
         # Plot 3 is a packed-board buy. Do not inherit late-ramp empty relax.
         if s["empty"] > int(PARAMS["land2_empty_max"]):
             return False
-        if berry_ok(s):
+        if berry_sink(s) > 0:
             from brain.schedules import berry_land2_strawberry_floor
 
             berry_min = berry_land2_strawberry_floor(int(PARAMS["land2_strawberry_min"]))
@@ -2505,10 +2524,23 @@ def _lookahead_project_scores(
 
 
 def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
-    below_floor = s["cows"] < 2 or s["sheep"] < 2
-    if s["hour"] != 0 and not below_floor:
+    cow_floor = int(PARAMS.get("cow_floor", 2))
+    sheep_floor = int(PARAMS.get("sheep_floor", 2))
+    below_floor = s["cows"] < cow_floor or s["sheep"] < sheep_floor
+    # Expansion is dawn-only except milk densify (pizza before berries),
+    # which still needs mid-day garnish buys. Floor recovery may buy mid-day;
+    # berry sheep-dip is species-gated in the candidate loop below.
+    milk_led = milk_sink(s) >= 1 and berry_sink(s) == 0
+    if int(s.get("hour") or 0) != 0 and not below_floor and not milk_led:
         return afford
     if s["day"] >= PARAMS["animal_buy_day_max"] and not below_floor:
+        return afford
+    # Berry engines stop expanding earlier so late water goes to the stand.
+    if (
+        not below_floor
+        and engine_of(s) == "BERRY"
+        and int(s["day"]) > int(PARAMS.get("berry_animal_buy_day_max", 18))
+    ):
         return afford
     if s["day"] < PARAMS["animal_buy_day_min"] and not below_floor:
         return afford
@@ -2530,6 +2562,11 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     mouth_cap = (
         PARAMS["mouth_cap_1q"] if s["n_quads"] == 1 else PARAMS["mouth_cap_2qplus"]
     )
+    # Soft mouth cap on berry maps — pasture spam starves strawberry water.
+    if engine_of(s) == "BERRY" and berry_sink(s) > 0:
+        mouth_cap = min(
+            int(mouth_cap), int(PARAMS.get("berry_herd_mouth_cap", 10))
+        )
     if mouths_of(s) >= mouth_cap:
         return afford
     if s["n_quads"] == 1 and cash_shop(s) and cash_room < 6 and not below_floor:
@@ -2569,6 +2606,18 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
         ("SHEEP", want_sheep(s), s["sheep"]),
         ("GOOSE", want_geese(s), s["geese"]),
     ):
+        # Berry sheep-dip trap: cows at floor + sheep under floor unlocked
+        # all-day cow garnish while census lagged (seed 123).
+        sheep_dip = (
+            below_floor
+            and engine_of(s) == "BERRY"
+            and s["cows"] >= cow_floor
+            and s["sheep"] < sheep_floor
+        )
+        if sheep_dip:
+            if kind != "SHEEP":
+                continue
+            want = sheep_floor
         need = want - have
         if need <= 0 or afford < ANIMAL_COST[kind] or s["empty"] < 2:
             continue

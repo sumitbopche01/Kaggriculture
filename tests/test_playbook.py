@@ -383,6 +383,16 @@ class PrimaryHelperTests(unittest.TestCase):
         self.assertFalse(berry_opened_first(10, 3))
         self.assertEqual(
             primary_cash_crop(
+                {"STRAWBERRY": 2, "TOMATO": 2},
+                viable={"STRAWBERRY": True, "TOMATO": True, "CARROT": False},
+                milk_n=2,
+                first_berry_day=12,
+                first_milk_day=3,
+            ),
+            "STRAWBERRY",
+        )
+        self.assertEqual(
+            primary_cash_crop(
                 {"TOMATO": 2},
                 viable={"STRAWBERRY": False, "TOMATO": True, "CARROT": False},
             ),
