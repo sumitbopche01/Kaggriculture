@@ -1,0 +1,222 @@
+{
+  "ALL": {
+    "n": 12,
+    "median_reward": 91040.5,
+    "median_land1_day": 9.0,
+    "median_land2_day": 8.5,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 0.16666666666666666,
+    "median_peak_hands": 11.0,
+    "median_first_full_crew_day": 9.0,
+    "median_dump_day": 29.0,
+    "median_late_sell_share": 0.24557502463929687,
+    "median_cows_peak": 10.0,
+    "median_berry_peak": 4.0,
+    "median_tomato_peak": 11.0,
+    "median_wheat_peak": 13.0,
+    "share_melon_day0": 0.75,
+    "hire_curve_median": {
+      "0": 8.0,
+      "1": 8.0,
+      "2": 8.0,
+      "3": 8.0,
+      "4": 8.0,
+      "5": 8.0,
+      "6": 8.0,
+      "7": 8.0,
+      "8": 8.0,
+      "9": 11.0,
+      "10": 11.0,
+      "11": 11.0,
+      "12": 11.0,
+      "13": 11.0,
+      "14": 11.0,
+      "15": 11.0,
+      "16": 11.0,
+      "17": 11.0,
+      "18": 11.0,
+      "19": 11.0,
+      "20": 11.0
+    },
+    "top_winners": [
+      {
+        "episode": 90118462,
+        "seed": 288397675,
+        "name": "GPTatoes",
+        "reward": 120860.0,
+        "land_days": [
+          10
+        ],
+        "cows": 8,
+        "berry": 2,
+        "tomato": 4,
+        "dump_day": 28
+      },
+      {
+        "episode": 92683251,
+        "seed": 595386954,
+        "name": "HamsterSashka",
+        "reward": 117122.0,
+        "land_days": [
+          6,
+          9
+        ],
+        "cows": 8,
+        "berry": 25,
+        "tomato": 36,
+        "dump_day": 29
+      },
+      {
+        "episode": 91963929,
+        "seed": 2088353691,
+        "name": "Winter Lamb",
+        "reward": 111141.0,
+        "land_days": [
+          6,
+          8,
+          12
+        ],
+        "cows": 11,
+        "berry": 19,
+        "tomato": 33,
+        "dump_day": 18
+      },
+      {
+        "episode": 89156328,
+        "seed": 1985447540,
+        "name": "motemen",
+        "reward": 92087.0,
+        "land_days": [
+          9
+        ],
+        "cows": 10,
+        "berry": 4,
+        "tomato": 10,
+        "dump_day": 29
+      },
+      {
+        "episode": 89363185,
+        "seed": 618929944,
+        "name": "hiroshi murakami",
+        "reward": 91259.0,
+        "land_days": [
+          9
+        ],
+        "cows": 10,
+        "berry": 4,
+        "tomato": 11,
+        "dump_day": 29
+      }
+    ]
+  },
+  "BERRY": {
+    "n": 12,
+    "median_reward": 91040.5,
+    "median_land1_day": 9.0,
+    "median_land2_day": 8.5,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 0.16666666666666666,
+    "median_peak_hands": 11.0,
+    "median_first_full_crew_day": 9.0,
+    "median_dump_day": 29.0,
+    "median_late_sell_share": 0.24557502463929687,
+    "median_cows_peak": 10.0,
+    "median_berry_peak": 4.0,
+    "median_tomato_peak": 11.0,
+    "median_wheat_peak": 13.0,
+    "share_melon_day0": 0.75,
+    "hire_curve_median": {
+      "0": 8.0,
+      "1": 8.0,
+      "2": 8.0,
+      "3": 8.0,
+      "4": 8.0,
+      "5": 8.0,
+      "6": 8.0,
+      "7": 8.0,
+      "8": 8.0,
+      "9": 11.0,
+      "10": 11.0,
+      "11": 11.0,
+      "12": 11.0,
+      "13": 11.0,
+      "14": 11.0,
+      "15": 11.0,
+      "16": 11.0,
+      "17": 11.0,
+      "18": 11.0,
+      "19": 11.0,
+      "20": 11.0
+    },
+    "top_winners": [
+      {
+        "episode": 90118462,
+        "seed": 288397675,
+        "name": "GPTatoes",
+        "reward": 120860.0,
+        "land_days": [
+          10
+        ],
+        "cows": 8,
+        "berry": 2,
+        "tomato": 4,
+        "dump_day": 28
+      },
+      {
+        "episode": 92683251,
+        "seed": 595386954,
+        "name": "HamsterSashka",
+        "reward": 117122.0,
+        "land_days": [
+          6,
+          9
+        ],
+        "cows": 8,
+        "berry": 25,
+        "tomato": 36,
+        "dump_day": 29
+      },
+      {
+        "episode": 91963929,
+        "seed": 2088353691,
+        "name": "Winter Lamb",
+        "reward": 111141.0,
+        "land_days": [
+          6,
+          8,
+          12
+        ],
+        "cows": 11,
+        "berry": 19,
+        "tomato": 33,
+        "dump_day": 18
+      },
+      {
+        "episode": 89156328,
+        "seed": 1985447540,
+        "name": "motemen",
+        "reward": 92087.0,
+        "land_days": [
+          9
+        ],
+        "cows": 10,
+        "berry": 4,
+        "tomato": 10,
+        "dump_day": 29
+      },
+      {
+        "episode": 89363185,
+        "seed": 618929944,
+        "name": "hiroshi murakami",
+        "reward": 91259.0,
+        "land_days": [
+          9
+        ],
+        "cows": 10,
+        "berry": 4,
+        "tomato": 11,
+        "dump_day": 29
+      }
+    ]
+  }
+}

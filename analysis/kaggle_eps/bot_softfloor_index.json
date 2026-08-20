@@ -1,0 +1,824 @@
+[
+  {
+    "bot": "structured",
+    "seed": 12,
+    "us": 152028.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-12679862-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 12,
+    "us": 151667.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "PET_CAFE",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-39471812-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 12,
+    "us": 179476.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-54462899-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 12,
+    "us": 163739.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "FARMERS_MARKET",
+      "ICE_CREAM_SHOP",
+      "PET_CAFE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-67706615-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 12,
+    "us": 82748.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-20098886-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 12,
+    "us": 152627.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "PET_CAFE",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-16567575-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 33,
+    "us": 135533.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "FARMERS_MARKET",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-24358312-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 33,
+    "us": 172315.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "ICE_CREAM_SHOP",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-63544529-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 33,
+    "us": 112416.0,
+    "tag": "PIZZA_EARLY",
+    "shops": [
+      "BAKERY",
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-61446558-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 33,
+    "us": 132466.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "FARMERS_MARKET",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-53971835-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 33,
+    "us": 86385.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "BRUNCH_SPOT",
+      "ICE_CREAM_SHOP",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-11579564-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 33,
+    "us": 173067.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "ICE_CREAM_SHOP",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-94889125-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 123,
+    "us": 155669.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-57655784-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 123,
+    "us": 97581.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "PET_CAFE",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-94615185-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 123,
+    "us": 124897.0,
+    "tag": "BERRY_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "PET_CAFE",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-94744030-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 123,
+    "us": 184762.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-87269307-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 123,
+    "us": 78264.0,
+    "tag": "PIZZA_EARLY",
+    "shops": [
+      "BAKERY",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-44877036-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 123,
+    "us": 98356.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "PET_CAFE",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-61591653-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 49090797,
+    "us": 127591.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "PET_CAFE",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-44583929-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 49090797,
+    "us": 107017.0,
+    "tag": "PIZZA_EARLY",
+    "shops": [
+      "BAKERY",
+      "PET_CAFE",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-17791979-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 49090797,
+    "us": 135990.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-92800892-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 49090797,
+    "us": 168620.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-14970406-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 49090797,
+    "us": 65921.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "PET_CAFE",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-57362677-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 49090797,
+    "us": 107645.0,
+    "tag": "PIZZA_EARLY",
+    "shops": [
+      "BAKERY",
+      "PET_CAFE",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-75720250-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 965622909,
+    "us": 143418.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "FARMERS_MARKET",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-88473552-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 965622909,
+    "us": 165546.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "PET_CAFE",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-25265502-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 965622909,
+    "us": 138998.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-89295027-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 965622909,
+    "us": 185772.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-28087075-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 965622909,
+    "us": 86651.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "ICE_CREAM_SHOP",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-75694804-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 965622909,
+    "us": 166242.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "PET_CAFE",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-30773885-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 94031431,
+    "us": 138959.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-43126224-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 94031431,
+    "us": 163344.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "BRUNCH_SPOT",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-69918174-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 94031431,
+    "us": 134852.0,
+    "tag": "BERRY_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "FARMERS_MARKET",
+      "PET_CAFE",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-44642355-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 94031431,
+    "us": 150405.0,
+    "tag": "BERRY_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "PET_CAFE",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-47107875-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 94031431,
+    "us": 82878.0,
+    "tag": "PIZZA_EARLY",
+    "shops": [
+      "BAKERY",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-94715604-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 94031431,
+    "us": 163987.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "BRUNCH_SPOT",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-98246915-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 9999,
+    "us": 139618.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-24235654-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 9999,
+    "us": 90891.0,
+    "tag": "BERRY_EARLY",
+    "shops": [
+      "BAKERY",
+      "FARMERS_MARKET",
+      "PET_CAFE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-46955007-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 9999,
+    "us": 139479.0,
+    "tag": "PIZZA_EARLY",
+    "shops": [
+      "BAKERY",
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-52404208-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 9999,
+    "us": 179170.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "ICE_CREAM_SHOP",
+      "PET_CAFE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-44929485-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 9999,
+    "us": 89423.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-22157577-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 9999,
+    "us": 91651.0,
+    "tag": "BERRY_EARLY",
+    "shops": [
+      "BAKERY",
+      "FARMERS_MARKET",
+      "PET_CAFE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-20925350-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 195016893,
+    "us": 150841.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-86042824-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 195016893,
+    "us": 144946.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-37691599-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 195016893,
+    "us": 119858.0,
+    "tag": "PIZZA_EARLY",
+    "shops": [
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-37825861-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 195016893,
+    "us": 146868.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-84343653-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 195016893,
+    "us": 86333.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-47632204-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 195016893,
+    "us": 145439.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-33204613-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 6,
+    "us": 153277.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "ICE_CREAM_SHOP",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-66217911-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 6,
+    "us": 166443.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-81358267-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 6,
+    "us": 125084.0,
+    "tag": "PIZZA_EARLY",
+    "shops": [
+      "BAKERY",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-18000948-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 6,
+    "us": 193641.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-29025391-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 6,
+    "us": 93773.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-56560837-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 6,
+    "us": 167024.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-53029526-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 21,
+    "us": 128785.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "BRUNCH_SPOT",
+      "PIZZA_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-57790543-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 21,
+    "us": 166723.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-93858232-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 21,
+    "us": 157743.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "BRUNCH_SPOT",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-18849319-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 21,
+    "us": 179598.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "FARMERS_MARKET",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-53808892-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 21,
+    "us": 85229.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-96201163-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 21,
+    "us": 167433.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "ICE_CREAM_SHOP",
+      "PET_CAFE",
+      "PIZZA_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-62513636-replay.json"
+  },
+  {
+    "bot": "structured",
+    "seed": 757227658,
+    "us": 138401.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "FARMERS_MARKET",
+      "ICE_CREAM_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-40341547-replay.json"
+  },
+  {
+    "bot": "frontier_soil",
+    "seed": 757227658,
+    "us": 166728.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "FARMERS_MARKET",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-13549597-replay.json"
+  },
+  {
+    "bot": "hamburger",
+    "seed": 757227658,
+    "us": 175488.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BAKERY",
+      "ICE_CREAM_SHOP",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-21441490-replay.json"
+  },
+  {
+    "bot": "top10_read",
+    "seed": 757227658,
+    "us": 180985.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "FARMERS_MARKET",
+      "SMOOTHIE_SHOP",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-36359896-replay.json"
+  },
+  {
+    "bot": "ecobot_v2",
+    "seed": 757227658,
+    "us": 70545.0,
+    "tag": "BERRY_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "PET_CAFE",
+      "YARN_STORE"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-78752167-replay.json"
+  },
+  {
+    "bot": "boatlee_v16",
+    "seed": 757227658,
+    "us": 167226.0,
+    "tag": "MIXED_EARLY",
+    "shops": [
+      "BRUNCH_SPOT",
+      "FARMERS_MARKET",
+      "PIZZA_SHOP",
+      "SMOOTHIE_SHOP"
+    ],
+    "path": "/Users/sumitbopche/Documents/Kaggle/Kaggriculture/replays/bot_softfloor/episode-54330760-replay.json"
+  }
+]

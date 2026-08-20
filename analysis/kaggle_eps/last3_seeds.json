@@ -1,0 +1,1388 @@
+{
+  "n_episodes": 77,
+  "n_unique_seeds": 75,
+  "seeds": [
+    0,
+    37514770,
+    96823174,
+    102771766,
+    104793062,
+    137383801,
+    177371887,
+    201109396,
+    212801414,
+    214408169,
+    269540093,
+    316945216,
+    343635847,
+    360922415,
+    375954346,
+    384976034,
+    402898773,
+    406050412,
+    409488828,
+    439973987,
+    466183955,
+    510360931,
+    538446151,
+    576467774,
+    677151940,
+    687822168,
+    697247901,
+    714754495,
+    761083594,
+    796493074,
+    796605284,
+    897688219,
+    933171150,
+    958183153,
+    1042860465,
+    1043041600,
+    1055941047,
+    1163631300,
+    1210701737,
+    1245111266,
+    1279909885,
+    1331251194,
+    1360331963,
+    1371318646,
+    1373792371,
+    1386607876,
+    1396284857,
+    1397505211,
+    1440364774,
+    1470163932,
+    1493493436,
+    1506490507,
+    1511764748,
+    1514404541,
+    1532410732,
+    1603554153,
+    1606600003,
+    1611947564,
+    1613212566,
+    1673247076,
+    1678164798,
+    1740485088,
+    1751136906,
+    1764305588,
+    1780278433,
+    1803502129,
+    1861334272,
+    1907127599,
+    1922579880,
+    1962135384,
+    1995450057,
+    2040999182,
+    2054328205,
+    2119990058,
+    2140015536
+  ],
+  "by_seed": {
+    "0": [
+      {
+        "episode_id": 95164651,
+        "seed": 0,
+        "us_idx": 0,
+        "our_score": 62692.0,
+        "opp_score": 59900.0,
+        "opp_name": "Sumit Bopche",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_VALIDATION"
+      },
+      {
+        "episode_id": 95144107,
+        "seed": 0,
+        "us_idx": 0,
+        "our_score": 46095.0,
+        "opp_score": 44882.0,
+        "opp_name": "Sumit Bopche",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_VALIDATION"
+      },
+      {
+        "episode_id": 94622906,
+        "seed": 0,
+        "us_idx": 0,
+        "our_score": 57173.0,
+        "opp_score": 62779.0,
+        "opp_name": "Sumit Bopche",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_VALIDATION"
+      }
+    ],
+    "37514770": [
+      {
+        "episode_id": 94647808,
+        "seed": 37514770,
+        "us_idx": 1,
+        "our_score": 55587.0,
+        "opp_score": 73876.0,
+        "opp_name": "Kh\u00f4i Tr\u1ea7n",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "96823174": [
+      {
+        "episode_id": 94649498,
+        "seed": 96823174,
+        "us_idx": 0,
+        "our_score": 54858.0,
+        "opp_score": 38254.0,
+        "opp_name": "Napier1550",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "102771766": [
+      {
+        "episode_id": 95182752,
+        "seed": 102771766,
+        "us_idx": 1,
+        "our_score": 33931.0,
+        "opp_score": 23322.0,
+        "opp_name": "kzeus@003",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "104793062": [
+      {
+        "episode_id": 95198565,
+        "seed": 104793062,
+        "us_idx": 0,
+        "our_score": 52256.0,
+        "opp_score": 162448.0,
+        "opp_name": "kay.liechtenstein",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "137383801": [
+      {
+        "episode_id": 94624215,
+        "seed": 137383801,
+        "us_idx": 0,
+        "our_score": 33946.0,
+        "opp_score": 27929.0,
+        "opp_name": "BSam79",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "177371887": [
+      {
+        "episode_id": 94746885,
+        "seed": 177371887,
+        "us_idx": 0,
+        "our_score": 37648.0,
+        "opp_score": 34398.0,
+        "opp_name": "Ztrk",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "201109396": [
+      {
+        "episode_id": 94654573,
+        "seed": 201109396,
+        "us_idx": 1,
+        "our_score": 49110.0,
+        "opp_score": 44865.0,
+        "opp_name": "Moriarty",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "212801414": [
+      {
+        "episode_id": 94656254,
+        "seed": 212801414,
+        "us_idx": 1,
+        "our_score": 48897.0,
+        "opp_score": 49613.0,
+        "opp_name": "Mehmet Ensar \u00c7etin",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "214408169": [
+      {
+        "episode_id": 95178162,
+        "seed": 214408169,
+        "us_idx": 1,
+        "our_score": 54705.0,
+        "opp_score": 21626.0,
+        "opp_name": "BYRON OKOU",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "269540093": [
+      {
+        "episode_id": 95157497,
+        "seed": 269540093,
+        "us_idx": 1,
+        "our_score": 31397.0,
+        "opp_score": 72237.0,
+        "opp_name": "Vishwanath N Iyer",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "316945216": [
+      {
+        "episode_id": 95159801,
+        "seed": 316945216,
+        "us_idx": 1,
+        "our_score": 58058.0,
+        "opp_score": 98995.0,
+        "opp_name": "yuki",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "343635847": [
+      {
+        "episode_id": 95148321,
+        "seed": 343635847,
+        "us_idx": 0,
+        "our_score": 54329.0,
+        "opp_score": 83646.0,
+        "opp_name": "Ash0666",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "360922415": [
+      {
+        "episode_id": 94641065,
+        "seed": 360922415,
+        "us_idx": 0,
+        "our_score": 55107.0,
+        "opp_score": 55208.0,
+        "opp_name": "takemo",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "375954346": [
+      {
+        "episode_id": 94694892,
+        "seed": 375954346,
+        "us_idx": 0,
+        "our_score": 60443.0,
+        "opp_score": 63556.0,
+        "opp_name": "Abdulazeez AbdulMumeen",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "384976034": [
+      {
+        "episode_id": 95201030,
+        "seed": 384976034,
+        "us_idx": 0,
+        "our_score": 54962.0,
+        "opp_score": 46179.0,
+        "opp_name": "Gleb Naumkin",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "402898773": [
+      {
+        "episode_id": 94657960,
+        "seed": 402898773,
+        "us_idx": 1,
+        "our_score": 48053.0,
+        "opp_score": 77644.0,
+        "opp_name": "lbs-vadar",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "406050412": [
+      {
+        "episode_id": 95155211,
+        "seed": 406050412,
+        "us_idx": 0,
+        "our_score": 59256.0,
+        "opp_score": 41748.0,
+        "opp_name": "Dongre Laxman",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "409488828": [
+      {
+        "episode_id": 95203334,
+        "seed": 409488828,
+        "us_idx": 1,
+        "our_score": 70229.0,
+        "opp_score": 83070.0,
+        "opp_name": "Marcben James Samuel",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "439973987": [
+      {
+        "episode_id": 95168997,
+        "seed": 439973987,
+        "us_idx": 1,
+        "our_score": 42187.0,
+        "opp_score": 53718.0,
+        "opp_name": "AlexMoura2026",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "466183955": [
+      {
+        "episode_id": 95180459,
+        "seed": 466183955,
+        "us_idx": 1,
+        "our_score": 61211.0,
+        "opp_score": 94862.0,
+        "opp_name": "Anthaus",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "510360931": [
+      {
+        "episode_id": 94627577,
+        "seed": 510360931,
+        "us_idx": 0,
+        "our_score": 46202.0,
+        "opp_score": 58638.0,
+        "opp_name": "UT",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "538446151": [
+      {
+        "episode_id": 94632626,
+        "seed": 538446151,
+        "us_idx": 0,
+        "our_score": 48776.0,
+        "opp_score": 76802.0,
+        "opp_name": "engin_zhou",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "576467774": [
+      {
+        "episode_id": 95210211,
+        "seed": 576467774,
+        "us_idx": 1,
+        "our_score": 53957.0,
+        "opp_score": 49247.0,
+        "opp_name": "Preet",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "677151940": [
+      {
+        "episode_id": 95168874,
+        "seed": 677151940,
+        "us_idx": 1,
+        "our_score": 70697.0,
+        "opp_score": 97635.0,
+        "opp_name": "m-toshi desu",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "687822168": [
+      {
+        "episode_id": 94637688,
+        "seed": 687822168,
+        "us_idx": 0,
+        "our_score": 50873.0,
+        "opp_score": 54854.0,
+        "opp_name": "cmasch",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "697247901": [
+      {
+        "episode_id": 95217085,
+        "seed": 697247901,
+        "us_idx": 1,
+        "our_score": 65611.0,
+        "opp_score": 79041.0,
+        "opp_name": "Aji Samudra",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "714754495": [
+      {
+        "episode_id": 95175748,
+        "seed": 714754495,
+        "us_idx": 1,
+        "our_score": 54669.0,
+        "opp_score": 45783.0,
+        "opp_name": "Karen Letir",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "761083594": [
+      {
+        "episode_id": 94740414,
+        "seed": 761083594,
+        "us_idx": 0,
+        "our_score": 50136.0,
+        "opp_score": 85557.0,
+        "opp_name": "Takayuki Michishita",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "796493074": [
+      {
+        "episode_id": 95191801,
+        "seed": 796493074,
+        "us_idx": 0,
+        "our_score": 71081.0,
+        "opp_score": 98014.0,
+        "opp_name": "panacea9320",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "796605284": [
+      {
+        "episode_id": 94847340,
+        "seed": 796605284,
+        "us_idx": 0,
+        "our_score": 27463.0,
+        "opp_score": 54624.0,
+        "opp_name": "Pralay Ghosh",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "897688219": [
+      {
+        "episode_id": 95205634,
+        "seed": 897688219,
+        "us_idx": 0,
+        "our_score": 76848.0,
+        "opp_score": 55647.0,
+        "opp_name": "Sxwat",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "933171150": [
+      {
+        "episode_id": 95191945,
+        "seed": 933171150,
+        "us_idx": 1,
+        "our_score": 47611.0,
+        "opp_score": 69864.0,
+        "opp_name": "deflexor",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "958183153": [
+      {
+        "episode_id": 94634314,
+        "seed": 958183153,
+        "us_idx": 0,
+        "our_score": 52361.0,
+        "opp_score": 37092.0,
+        "opp_name": "Louis WhoEat",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1042860465": [
+      {
+        "episode_id": 95162105,
+        "seed": 1042860465,
+        "us_idx": 1,
+        "our_score": 41156.0,
+        "opp_score": 48280.0,
+        "opp_name": "Jarbas Camur\u00e7a",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1043041600": [
+      {
+        "episode_id": 95173592,
+        "seed": 1043041600,
+        "us_idx": 1,
+        "our_score": 71569.0,
+        "opp_score": 33636.0,
+        "opp_name": "Aniket Sharma",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1055941047": [
+      {
+        "episode_id": 95214797,
+        "seed": 1055941047,
+        "us_idx": 1,
+        "our_score": 53045.0,
+        "opp_score": 94212.0,
+        "opp_name": "nao.kwmr",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1163631300": [
+      {
+        "episode_id": 95189498,
+        "seed": 1163631300,
+        "us_idx": 0,
+        "our_score": 38158.0,
+        "opp_score": 45008.0,
+        "opp_name": "HamzZZzzZZa",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1210701737": [
+      {
+        "episode_id": 95180315,
+        "seed": 1210701737,
+        "us_idx": 1,
+        "our_score": 46268.0,
+        "opp_score": 108665.0,
+        "opp_name": "Tergel Munkhbat",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1245111266": [
+      {
+        "episode_id": 95207920,
+        "seed": 1245111266,
+        "us_idx": 1,
+        "our_score": 69209.0,
+        "opp_score": 39295.0,
+        "opp_name": "iBooNDK",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1279909885": [
+      {
+        "episode_id": 94651186,
+        "seed": 1279909885,
+        "us_idx": 1,
+        "our_score": 54051.0,
+        "opp_score": 63780.0,
+        "opp_name": "Mahdi Rafati",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1331251194": [
+      {
+        "episode_id": 95171166,
+        "seed": 1331251194,
+        "us_idx": 0,
+        "our_score": 63466.0,
+        "opp_score": 51995.0,
+        "opp_name": "Aditya Pandey",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1360331963": [
+      {
+        "episode_id": 95150616,
+        "seed": 1360331963,
+        "us_idx": 1,
+        "our_score": 44948.0,
+        "opp_score": 27641.0,
+        "opp_name": "Shailaja J",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1371318646": [
+      {
+        "episode_id": 95185070,
+        "seed": 1371318646,
+        "us_idx": 0,
+        "our_score": 45015.0,
+        "opp_score": 31731.0,
+        "opp_name": "Aek KunKub",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1373792371": [
+      {
+        "episode_id": 94639391,
+        "seed": 1373792371,
+        "us_idx": 1,
+        "our_score": 45435.0,
+        "opp_score": 26161.0,
+        "opp_name": "Ken Li",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1386607876": [
+      {
+        "episode_id": 94635995,
+        "seed": 1386607876,
+        "us_idx": 1,
+        "our_score": 38429.0,
+        "opp_score": 44639.0,
+        "opp_name": "Vishwanath N Iyer",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1396284857": [
+      {
+        "episode_id": 95178027,
+        "seed": 1396284857,
+        "us_idx": 0,
+        "our_score": 65499.0,
+        "opp_score": 54202.0,
+        "opp_name": "Srish Jana",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1397505211": [
+      {
+        "episode_id": 95171303,
+        "seed": 1397505211,
+        "us_idx": 0,
+        "our_score": 58424.0,
+        "opp_score": 39149.0,
+        "opp_name": "\u0110\u00f4ng H\u00e0",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1440364774": [
+      {
+        "episode_id": 95187216,
+        "seed": 1440364774,
+        "us_idx": 0,
+        "our_score": 50054.0,
+        "opp_score": 57226.0,
+        "opp_name": "YOUSSEF FAID",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1470163932": [
+      {
+        "episode_id": 95187352,
+        "seed": 1470163932,
+        "us_idx": 0,
+        "our_score": 55927.0,
+        "opp_score": 65910.0,
+        "opp_name": "Christopher34",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1493493436": [
+      {
+        "episode_id": 94657852,
+        "seed": 1493493436,
+        "us_idx": 0,
+        "our_score": 46956.0,
+        "opp_score": 62398.0,
+        "opp_name": "Moriarty",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1506490507": [
+      {
+        "episode_id": 94965928,
+        "seed": 1506490507,
+        "us_idx": 1,
+        "our_score": 54698.0,
+        "opp_score": 58255.0,
+        "opp_name": "SoraGinko",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1511764748": [
+      {
+        "episode_id": 95166652,
+        "seed": 1511764748,
+        "us_idx": 1,
+        "our_score": 48669.0,
+        "opp_score": 56424.0,
+        "opp_name": "Vandana Pathania",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1514404541": [
+      {
+        "episode_id": 95189658,
+        "seed": 1514404541,
+        "us_idx": 0,
+        "our_score": 36891.0,
+        "opp_score": 23669.0,
+        "opp_name": "Antoine",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1532410732": [
+      {
+        "episode_id": 95112100,
+        "seed": 1532410732,
+        "us_idx": 0,
+        "our_score": 48025.0,
+        "opp_score": 52216.0,
+        "opp_name": "Nur Srijan",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1603554153": [
+      {
+        "episode_id": 95198750,
+        "seed": 1603554153,
+        "us_idx": 1,
+        "our_score": 64495.0,
+        "opp_score": 93650.0,
+        "opp_name": "Cole",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1606600003": [
+      {
+        "episode_id": 95173464,
+        "seed": 1606600003,
+        "us_idx": 0,
+        "our_score": 61662.0,
+        "opp_score": 34239.0,
+        "opp_name": "Gnr8tr",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1611947564": [
+      {
+        "episode_id": 95166697,
+        "seed": 1611947564,
+        "us_idx": 0,
+        "our_score": 33414.0,
+        "opp_score": 21939.0,
+        "opp_name": "Yohanes Lengkong",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1613212566": [
+      {
+        "episode_id": 94629270,
+        "seed": 1613212566,
+        "us_idx": 0,
+        "our_score": 61696.0,
+        "opp_score": 23849.0,
+        "opp_name": "zongze Yan",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1673247076": [
+      {
+        "episode_id": 95175889,
+        "seed": 1673247076,
+        "us_idx": 1,
+        "our_score": 57544.0,
+        "opp_score": 33621.0,
+        "opp_name": "Ahmed Karim",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1678164798": [
+      {
+        "episode_id": 95196413,
+        "seed": 1678164798,
+        "us_idx": 1,
+        "our_score": 71386.0,
+        "opp_score": 74948.0,
+        "opp_name": "Team-Veraxion",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1740485088": [
+      {
+        "episode_id": 95152908,
+        "seed": 1740485088,
+        "us_idx": 0,
+        "our_score": 56476.0,
+        "opp_score": 56723.0,
+        "opp_name": "VYSHAKH G NAIR",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1751136906": [
+      {
+        "episode_id": 94630951,
+        "seed": 1751136906,
+        "us_idx": 1,
+        "our_score": 59287.0,
+        "opp_score": 30593.0,
+        "opp_name": "K VISHALINI",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1764305588": [
+      {
+        "episode_id": 94625881,
+        "seed": 1764305588,
+        "us_idx": 1,
+        "our_score": 61538.0,
+        "opp_score": 76876.0,
+        "opp_name": "JSQL",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1780278433": [
+      {
+        "episode_id": 95184923,
+        "seed": 1780278433,
+        "us_idx": 1,
+        "our_score": 76480.0,
+        "opp_score": 74129.0,
+        "opp_name": "one",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1803502129": [
+      {
+        "episode_id": 95194054,
+        "seed": 1803502129,
+        "us_idx": 1,
+        "our_score": 60781.0,
+        "opp_score": 89931.0,
+        "opp_name": "ALLAI",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1861334272": [
+      {
+        "episode_id": 94652888,
+        "seed": 1861334272,
+        "us_idx": 1,
+        "our_score": 48586.0,
+        "opp_score": 36543.0,
+        "opp_name": "Moatez Litaiem",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1907127599": [
+      {
+        "episode_id": 95194245,
+        "seed": 1907127599,
+        "us_idx": 0,
+        "our_score": 60032.0,
+        "opp_score": 91279.0,
+        "opp_name": "Gabriele Giacometti",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1922579880": [
+      {
+        "episode_id": 95164401,
+        "seed": 1922579880,
+        "us_idx": 1,
+        "our_score": 42469.0,
+        "opp_score": 36606.0,
+        "opp_name": "Mutyam kavyanjali",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55645717,
+        "submission_score": "577.8",
+        "submission_desc": "crew-tile water + look-ahead",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1962135384": [
+      {
+        "episode_id": 95212502,
+        "seed": 1962135384,
+        "us_idx": 1,
+        "our_score": 81757.0,
+        "opp_score": 57735.0,
+        "opp_name": "GitLyf",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "1995450057": [
+      {
+        "episode_id": 94646121,
+        "seed": 1995450057,
+        "us_idx": 1,
+        "our_score": 52451.0,
+        "opp_score": 36595.0,
+        "opp_name": "Neeta Sanjay Gajabi",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "2040999182": [
+      {
+        "episode_id": 95194111,
+        "seed": 2040999182,
+        "us_idx": 1,
+        "our_score": 39716.0,
+        "opp_score": 30821.0,
+        "opp_name": "victor aguilera",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "2054328205": [
+      {
+        "episode_id": 95182614,
+        "seed": 2054328205,
+        "us_idx": 1,
+        "our_score": 55560.0,
+        "opp_score": 122692.0,
+        "opp_name": "yindujuxi",
+        "us_name": "Sumit Bopche",
+        "won": false,
+        "tie": false,
+        "submission_id": 55646301,
+        "submission_score": "645.0",
+        "submission_desc": "elite/top5 replay priors",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "2119990058": [
+      {
+        "episode_id": 94642756,
+        "seed": 2119990058,
+        "us_idx": 1,
+        "our_score": 54899.0,
+        "opp_score": 46099.0,
+        "opp_name": "Amin",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ],
+    "2140015536": [
+      {
+        "episode_id": 94644435,
+        "seed": 2140015536,
+        "us_idx": 1,
+        "our_score": 53754.0,
+        "opp_score": 17011.0,
+        "opp_name": "Caio Ruiz",
+        "us_name": "Sumit Bopche",
+        "won": true,
+        "tie": false,
+        "submission_id": 55630629,
+        "submission_score": "514.9",
+        "submission_desc": "unified brain",
+        "episode_type": "EpisodeType.EPISODE_TYPE_PUBLIC"
+      }
+    ]
+  }
+}

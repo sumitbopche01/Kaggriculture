@@ -137,6 +137,7 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "melon_cap": 12,
     "melon_bridge_cow_day_max": 12,
     "melon_bridge_cow_cap": 8,
+    "berry_melon_bridge_cow_cap": 8,
     "melon_bridge_melon_min": 6,
     # Herd ramp gates
     "cow_day_max": 24,
@@ -160,8 +161,11 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "land2_empty_max": 4,
     # Replay winners buy plot-3 near day 11 with ~10–12 berries, not 16.
     "land2_strawberry_min": 10,
-    "land2_schedule_cow_min": 4,
+    "land2_tomato_min": 12,
+    "land2_schedule_cow_min": 6,
     "land2_schedule_empty_max": 6,
+    "land2_dense_money_min": 2800,
+    "land2_dense_empty_max": 8,
     "berry_milk_cow_cap": 10,
     "berry_milk_cow_extra": 4,
     "berry_herd_mouth_cap": 12,
@@ -1199,20 +1203,24 @@ def want_cows(s: dict[str, Any]) -> int:
     # Milk-led = pizza densify (milk shops, no berry). Else ice-cream garnish.
     milk_led = milk_sink(s) >= 1 and berry_sink(s) == 0
     if not milk_led:
-        # Melon→cow bridge on smoothie/ice-cream maps only. Elites stock
-        # cows before berry EV clears (kay ~8 @d10); cap stays modest so
-        # yarn/bakery boards (seed 55) are not overgrazed.
+        # Melon→cow bridge before berry EV clears. Softfloor/meta elites stock
+        # ~8–10 cows by d10 on berry opens (not only ice/smoothie dual shops).
         melons = int(s["crops"].get("MELON", 0) or 0)
+        berry_open = berry_sink(s) >= 1
         dual = sum(
             1
             for sh in (s.get("shops") or [])
             if sh in ("ICE_CREAM_SHOP", "SMOOTHIE_SHOP")
         )
         bridge_cap = int(PARAMS.get("melon_bridge_cow_cap", 5))
+        if berry_open:
+            bridge_cap = max(
+                bridge_cap, int(PARAMS.get("berry_melon_bridge_cow_cap", 8))
+            )
         if (
             int(s["day"]) <= int(PARAMS.get("melon_bridge_cow_day_max", 12))
             and s["n_quads"] >= 2
-            and dual >= 1
+            and (dual >= 1 or berry_open)
             and melons >= int(PARAMS.get("melon_bridge_melon_min", 6))
             and herd_can_expand(s)
             and s["cows"] < bridge_cap
@@ -1359,17 +1367,13 @@ def need_land(s: dict[str, Any]) -> bool:
             return True
         return False
     if s["n_quads"] == 2:
-        # Pizza / milk-stack densify 50 tiles. Berry towns buy plot 3 on the
-        # elite schedule window (~d10–11, 75% of $85k+ ladder winners).
+        # Softfloor $100k+ bots buy plot-3 ~d10 even on pizza/pet opens.
+        # Tomato-meta elites often stay 2q — require a dense stand either way.
         strat = map_strategy(s)
-        pizza_or_milk = milk_sink(s) >= 1 and berry_sink(s) == 0
-        if pizza_or_milk or strat == "MILK_STACK":
-            return False
         berries = int(s["crops"].get("STRAWBERRY", 0) or 0)
         melons = int(s["crops"].get("MELON", 0) or 0)
-        if strat not in ("EARLY_BERRY", "LAND_SPRINT"):
-            if berry_sink(s) > 0 or milk_sink(s) >= 1:
-                return False
+        tomatoes = int(s["crops"].get("TOMATO", 0) or 0)
+        milk_only = (milk_sink(s) >= 1 and berry_sink(s) == 0) or strat == "MILK_STACK"
         # LAND_SPRINT is mainly a 1→2 densify cue. Plot-3 only when the
         # berry stand is already fat (seed 21 bought hollow plot-3 at ~6 berries).
         if strat == "LAND_SPRINT" and berries < int(
@@ -1379,27 +1383,39 @@ def need_land(s: dict[str, Any]) -> bool:
         from brain.schedules import berry_land2_day, berry_land2_strawberry_floor
 
         land2_day = berry_land2_day(int(PARAMS["land2_day_min"]))
-        # Elites unlock ~median land2 day; keep hard floor, no early buy.
         if int(s["day"]) < max(int(PARAMS["land2_day_min"]), land2_day - 1):
             return False
         if int(s["day"]) > int(PARAMS.get("land2_day_max", 22)):
             return False
-        if int(s["money"]) < PARAMS["land2_money_min"]:
+        money_min = int(PARAMS["land2_money_min"])
+        # Fat berry stands unlock plot-3 once cash exists; softfloor buys ~d10.
+        cow_min = int(PARAMS.get("land2_schedule_cow_min", 6))
+        if berries >= 16 and int(s["cows"]) >= cow_min:
+            money_min = min(money_min, int(PARAMS.get("land2_dense_money_min", 2800)))
+        if int(s["money"]) < money_min:
             return False
-        # Packed default; schedule buyers often still have a few empties.
         empty_max = int(PARAMS["land2_empty_max"])
-        if (
-            int(s["cows"]) >= int(PARAMS.get("land2_schedule_cow_min", 4))
-            and (berries >= 12 or melons >= 6)
-        ):
+        stand_ok = berries >= 12 or melons >= 6 or (
+            milk_only and tomatoes >= int(PARAMS.get("land2_tomato_min", 12))
+        )
+        if int(s["cows"]) >= cow_min and stand_ok:
             empty_max = max(empty_max, int(PARAMS.get("land2_schedule_empty_max", 6)))
+        if berries >= 16 and int(s["cows"]) >= cow_min:
+            empty_max = max(empty_max, int(PARAMS.get("land2_dense_empty_max", 8)))
         if s["empty"] > empty_max:
             return False
-        if berry_sink(s) > 0:
+        # Softfloor / kay buy plot-3 with a real herd, not a 2–3 cow floor.
+        if int(s["cows"]) < cow_min:
+            return False
+        if milk_only and not stand_ok:
+            return False
+        if berry_sink(s) > 0 and not milk_only:
             berry_min = berry_land2_strawberry_floor(int(PARAMS["land2_strawberry_min"]))
             if berries < berry_min and melons < 6:
                 return False
-        return True
+        elif not milk_only and berry_sink(s) == 0 and milk_sink(s) == 0:
+            return False
+        return stand_ok or (berry_sink(s) > 0 and berries >= int(PARAMS["land2_strawberry_min"]))
     return False
 
 

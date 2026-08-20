@@ -1,0 +1,226 @@
+{
+  "ALL": {
+    "n": 5,
+    "median_reward": 77644.0,
+    "median_land1_day": 8.0,
+    "median_land2_day": 11.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 0.6,
+    "median_peak_hands": 10.0,
+    "median_first_full_crew_day": 8.0,
+    "median_dump_day": 25.0,
+    "median_late_sell_share": 0.33373063170441003,
+    "median_cows_peak": 9.0,
+    "median_berry_peak": 9.0,
+    "median_tomato_peak": 4.0,
+    "median_wheat_peak": 8.0,
+    "share_melon_day0": 1.0,
+    "hire_curve_median": {
+      "0": 6.0,
+      "1": 5.0,
+      "2": 5.0,
+      "3": 6.0,
+      "4": 6.0,
+      "5": 6.0,
+      "6": 6.0,
+      "7": 6.0,
+      "8": 8.0,
+      "9": 9.0,
+      "10": 9.0,
+      "11": 10.0,
+      "12": 10.0,
+      "13": 10.0,
+      "14": 10.0,
+      "15": 10.0,
+      "16": 10.0,
+      "17": 10.0,
+      "18": 10.0,
+      "19": 10.0,
+      "20": 10.0
+    },
+    "top_winners": [
+      {
+        "episode": 95148321,
+        "seed": 343635847,
+        "name": "Ash0666",
+        "reward": 83646.0,
+        "land_days": [
+          8
+        ],
+        "cows": 9,
+        "berry": 8,
+        "tomato": 0,
+        "dump_day": 26
+      },
+      {
+        "episode": 95203334,
+        "seed": 409488828,
+        "name": "Marcben James Samuel",
+        "reward": 83070.0,
+        "land_days": [
+          7,
+          11
+        ],
+        "cows": 12,
+        "berry": 9,
+        "tomato": 4,
+        "dump_day": 25
+      },
+      {
+        "episode": 94657960,
+        "seed": 402898773,
+        "name": "lbs-vadar",
+        "reward": 77644.0,
+        "land_days": [
+          8,
+          9,
+          11,
+          15
+        ],
+        "cows": 15,
+        "berry": 14,
+        "tomato": 5,
+        "dump_day": 29
+      },
+      {
+        "episode": 94625881,
+        "seed": 1764305588,
+        "name": "JSQL",
+        "reward": 76876.0,
+        "land_days": [
+          10
+        ],
+        "cows": 8,
+        "berry": 8,
+        "tomato": 9,
+        "dump_day": 21
+      },
+      {
+        "episode": 94632626,
+        "seed": 538446151,
+        "name": "engin_zhou",
+        "reward": 76802.0,
+        "land_days": [
+          10,
+          14
+        ],
+        "cows": 6,
+        "berry": 9,
+        "tomato": 0,
+        "dump_day": 25
+      }
+    ]
+  },
+  "BERRY": {
+    "n": 5,
+    "median_reward": 77644.0,
+    "median_land1_day": 8.0,
+    "median_land2_day": 11.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 0.6,
+    "median_peak_hands": 10.0,
+    "median_first_full_crew_day": 8.0,
+    "median_dump_day": 25.0,
+    "median_late_sell_share": 0.33373063170441003,
+    "median_cows_peak": 9.0,
+    "median_berry_peak": 9.0,
+    "median_tomato_peak": 4.0,
+    "median_wheat_peak": 8.0,
+    "share_melon_day0": 1.0,
+    "hire_curve_median": {
+      "0": 6.0,
+      "1": 5.0,
+      "2": 5.0,
+      "3": 6.0,
+      "4": 6.0,
+      "5": 6.0,
+      "6": 6.0,
+      "7": 6.0,
+      "8": 8.0,
+      "9": 9.0,
+      "10": 9.0,
+      "11": 10.0,
+      "12": 10.0,
+      "13": 10.0,
+      "14": 10.0,
+      "15": 10.0,
+      "16": 10.0,
+      "17": 10.0,
+      "18": 10.0,
+      "19": 10.0,
+      "20": 10.0
+    },
+    "top_winners": [
+      {
+        "episode": 95148321,
+        "seed": 343635847,
+        "name": "Ash0666",
+        "reward": 83646.0,
+        "land_days": [
+          8
+        ],
+        "cows": 9,
+        "berry": 8,
+        "tomato": 0,
+        "dump_day": 26
+      },
+      {
+        "episode": 95203334,
+        "seed": 409488828,
+        "name": "Marcben James Samuel",
+        "reward": 83070.0,
+        "land_days": [
+          7,
+          11
+        ],
+        "cows": 12,
+        "berry": 9,
+        "tomato": 4,
+        "dump_day": 25
+      },
+      {
+        "episode": 94657960,
+        "seed": 402898773,
+        "name": "lbs-vadar",
+        "reward": 77644.0,
+        "land_days": [
+          8,
+          9,
+          11,
+          15
+        ],
+        "cows": 15,
+        "berry": 14,
+        "tomato": 5,
+        "dump_day": 29
+      },
+      {
+        "episode": 94625881,
+        "seed": 1764305588,
+        "name": "JSQL",
+        "reward": 76876.0,
+        "land_days": [
+          10
+        ],
+        "cows": 8,
+        "berry": 8,
+        "tomato": 9,
+        "dump_day": 21
+      },
+      {
+        "episode": 94632626,
+        "seed": 538446151,
+        "name": "engin_zhou",
+        "reward": 76802.0,
+        "land_days": [
+          10,
+          14
+        ],
+        "cows": 6,
+        "berry": 9,
+        "tomato": 0,
+        "dump_day": 25
+      }
+    ]
+  }
+}

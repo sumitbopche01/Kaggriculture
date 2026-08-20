@@ -1,0 +1,1459 @@
+[
+  {
+    "seed": 104793062,
+    "us": 84711,
+    "starter": 3506,
+    "shop_days": {
+      "ICE_CREAM_SHOP": 3,
+      "YARN_STORE": 6,
+      "FARMERS_MARKET": 9,
+      "BRUNCH_SPOT": 12,
+      "PIZZA_SHOP": 24
+    },
+    "first_berry": 3,
+    "first_milk": 3,
+    "first_pizza": 24,
+    "lands": [
+      [
+        6,
+        22,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1560.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "WHEAT": 7,
+        "STRAWBERRY": 19,
+        "MELON": 11
+      },
+      "animals": {
+        "SHEEP": 3,
+        "COW": 2
+      },
+      "empty": 8,
+      "weeds": 0,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "YARN_STORE",
+        "FARMERS_MARKET"
+      ]
+    },
+    "d20": {
+      "money": 31774.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 27,
+        "WHEAT": 9
+      },
+      "animals": {
+        "SHEEP": 4,
+        "COW": 3
+      },
+      "empty": 3,
+      "weeds": 3,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "YARN_STORE",
+        "FARMERS_MARKET",
+        "BRUNCH_SPOT",
+        "ICE_CREAM_SHOP",
+        "FARMERS_MARKET"
+      ]
+    },
+    "d29": {
+      "money": 81897.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 19
+      },
+      "animals": {
+        "SHEEP": 3,
+        "COW": 3
+      },
+      "empty": 15,
+      "weeds": 8,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "YARN_STORE",
+        "FARMERS_MARKET",
+        "BRUNCH_SPOT",
+        "ICE_CREAM_SHOP",
+        "FARMERS_MARKET",
+        "ICE_CREAM_SHOP",
+        "PIZZA_SHOP"
+      ]
+    }
+  },
+  {
+    "seed": 2054328205,
+    "us": 62369,
+    "starter": 3546,
+    "shop_days": {
+      "YARN_STORE": 3,
+      "BAKERY": 6,
+      "PET_CAFE": 9,
+      "ICE_CREAM_SHOP": 15,
+      "SMOOTHIE_SHOP": 24
+    },
+    "first_berry": 15,
+    "first_milk": 15,
+    "first_pizza": null,
+    "lands": [
+      [
+        6,
+        20,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 5407.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "MELON": 12,
+        "WHEAT": 9,
+        "CARROT": 4
+      },
+      "animals": {
+        "SHEEP": 4,
+        "COW": 2
+      },
+      "empty": 18,
+      "weeds": 1,
+      "shops": [
+        "YARN_STORE",
+        "BAKERY",
+        "PET_CAFE"
+      ]
+    },
+    "d20": {
+      "money": 30041.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 12,
+        "MELON": 8,
+        "WHEAT": 8
+      },
+      "animals": {
+        "SHEEP": 4,
+        "COW": 2
+      },
+      "empty": 9,
+      "weeds": 7,
+      "shops": [
+        "YARN_STORE",
+        "BAKERY",
+        "PET_CAFE",
+        "YARN_STORE",
+        "ICE_CREAM_SHOP",
+        "BAKERY"
+      ]
+    },
+    "d29": {
+      "money": 59184.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 35
+      },
+      "animals": {
+        "SHEEP": 4,
+        "COW": 2
+      },
+      "empty": 7,
+      "weeds": 2,
+      "shops": [
+        "YARN_STORE",
+        "BAKERY",
+        "PET_CAFE",
+        "YARN_STORE",
+        "ICE_CREAM_SHOP",
+        "BAKERY",
+        "PET_CAFE",
+        "SMOOTHIE_SHOP"
+      ]
+    }
+  },
+  {
+    "seed": 1210701737,
+    "us": 73493,
+    "starter": 3708,
+    "shop_days": {
+      "ICE_CREAM_SHOP": 3,
+      "PET_CAFE": 6,
+      "PIZZA_SHOP": 9,
+      "FARMERS_MARKET": 21,
+      "SMOOTHIE_SHOP": 24
+    },
+    "first_berry": 3,
+    "first_milk": 3,
+    "first_pizza": 9,
+    "lands": [
+      [
+        6,
+        22,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1517.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 13,
+        "MELON": 11,
+        "WHEAT": 7
+      },
+      "animals": {
+        "COW": 3,
+        "SHEEP": 2
+      },
+      "empty": 14,
+      "weeds": 0,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "PET_CAFE",
+        "PIZZA_SHOP"
+      ]
+    },
+    "d20": {
+      "money": 26752.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 26,
+        "WHEAT": 10
+      },
+      "animals": {
+        "COW": 5,
+        "SHEEP": 2
+      },
+      "empty": 3,
+      "weeds": 3,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "PET_CAFE",
+        "PIZZA_SHOP",
+        "PET_CAFE",
+        "PIZZA_SHOP",
+        "PIZZA_SHOP"
+      ]
+    },
+    "d29": {
+      "money": 70450.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 24
+      },
+      "animals": {
+        "COW": 5,
+        "SHEEP": 2
+      },
+      "empty": 12,
+      "weeds": 6,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "PET_CAFE",
+        "PIZZA_SHOP",
+        "PET_CAFE",
+        "PIZZA_SHOP",
+        "PIZZA_SHOP",
+        "FARMERS_MARKET",
+        "SMOOTHIE_SHOP"
+      ]
+    }
+  },
+  {
+    "seed": 796493074,
+    "us": 69958,
+    "starter": 3431,
+    "shop_days": {
+      "BAKERY": 3,
+      "PIZZA_SHOP": 6,
+      "YARN_STORE": 12,
+      "SMOOTHIE_SHOP": 15,
+      "FARMERS_MARKET": 21,
+      "ICE_CREAM_SHOP": 24
+    },
+    "first_berry": 15,
+    "first_milk": 6,
+    "first_pizza": 6,
+    "lands": [
+      [
+        6,
+        20,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 3858.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "TOMATO": 8,
+        "MELON": 12,
+        "WHEAT": 11
+      },
+      "animals": {
+        "COW": 5,
+        "SHEEP": 2
+      },
+      "empty": 12,
+      "weeds": 0,
+      "shops": [
+        "BAKERY",
+        "PIZZA_SHOP",
+        "BAKERY"
+      ]
+    },
+    "d20": {
+      "money": 35766.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "TOMATO": 8,
+        "WHEAT": 9
+      },
+      "animals": {
+        "SHEEP": 8,
+        "COW": 4,
+        "GOOSE": 1
+      },
+      "empty": 12,
+      "weeds": 5,
+      "shops": [
+        "BAKERY",
+        "PIZZA_SHOP",
+        "BAKERY",
+        "YARN_STORE",
+        "SMOOTHIE_SHOP",
+        "SMOOTHIE_SHOP"
+      ]
+    },
+    "d29": {
+      "money": 68798.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "CARROT": 4
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 2
+      },
+      "empty": 24,
+      "weeds": 6,
+      "shops": [
+        "BAKERY",
+        "PIZZA_SHOP",
+        "BAKERY",
+        "YARN_STORE",
+        "SMOOTHIE_SHOP",
+        "SMOOTHIE_SHOP",
+        "FARMERS_MARKET",
+        "ICE_CREAM_SHOP"
+      ]
+    }
+  },
+  {
+    "seed": 1603554153,
+    "us": 66165,
+    "starter": 3639,
+    "shop_days": {
+      "PET_CAFE": 3,
+      "ICE_CREAM_SHOP": 6,
+      "YARN_STORE": 9,
+      "BAKERY": 12,
+      "BRUNCH_SPOT": 15,
+      "PIZZA_SHOP": 18
+    },
+    "first_berry": 6,
+    "first_milk": 6,
+    "first_pizza": 18,
+    "lands": [
+      [
+        6,
+        22,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1545.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 12,
+        "MELON": 11,
+        "WHEAT": 7
+      },
+      "animals": {
+        "COW": 3,
+        "SHEEP": 2
+      },
+      "empty": 14,
+      "weeds": 1,
+      "shops": [
+        "PET_CAFE",
+        "ICE_CREAM_SHOP",
+        "YARN_STORE"
+      ]
+    },
+    "d20": {
+      "money": 26523.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 35,
+        "WHEAT": 6
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 3
+      },
+      "empty": 2,
+      "weeds": 1,
+      "shops": [
+        "PET_CAFE",
+        "ICE_CREAM_SHOP",
+        "YARN_STORE",
+        "BAKERY",
+        "BRUNCH_SPOT",
+        "PIZZA_SHOP"
+      ]
+    },
+    "d29": {
+      "money": 62704.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 26
+      },
+      "animals": {
+        "SHEEP": 1,
+        "COW": 3
+      },
+      "empty": 16,
+      "weeds": 2,
+      "shops": [
+        "PET_CAFE",
+        "ICE_CREAM_SHOP",
+        "YARN_STORE",
+        "BAKERY",
+        "BRUNCH_SPOT",
+        "PIZZA_SHOP",
+        "YARN_STORE",
+        "ICE_CREAM_SHOP"
+      ]
+    }
+  },
+  {
+    "seed": 409488828,
+    "us": 56836,
+    "starter": 4019,
+    "shop_days": {
+      "FARMERS_MARKET": 3,
+      "PET_CAFE": 6,
+      "BAKERY": 12,
+      "ICE_CREAM_SHOP": 18,
+      "YARN_STORE": 21
+    },
+    "first_berry": 3,
+    "first_milk": 18,
+    "first_pizza": null,
+    "lands": [
+      [
+        6,
+        22,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1512.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 18,
+        "MELON": 11,
+        "WHEAT": 6
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 2
+      },
+      "empty": 10,
+      "weeds": 1,
+      "shops": [
+        "FARMERS_MARKET",
+        "PET_CAFE",
+        "PET_CAFE"
+      ]
+    },
+    "d20": {
+      "money": 22183.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 37,
+        "WHEAT": 6
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 2
+      },
+      "empty": 1,
+      "weeds": 2,
+      "shops": [
+        "FARMERS_MARKET",
+        "PET_CAFE",
+        "PET_CAFE",
+        "BAKERY",
+        "BAKERY",
+        "ICE_CREAM_SHOP"
+      ]
+    },
+    "d29": {
+      "money": 56217.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 19
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 2
+      },
+      "empty": 26,
+      "weeds": 1,
+      "shops": [
+        "FARMERS_MARKET",
+        "PET_CAFE",
+        "PET_CAFE",
+        "BAKERY",
+        "BAKERY",
+        "ICE_CREAM_SHOP",
+        "YARN_STORE",
+        "FARMERS_MARKET"
+      ]
+    }
+  },
+  {
+    "seed": 677151940,
+    "us": 73381,
+    "starter": 3443,
+    "shop_days": {
+      "ICE_CREAM_SHOP": 3,
+      "SMOOTHIE_SHOP": 6,
+      "YARN_STORE": 9,
+      "PIZZA_SHOP": 15,
+      "BAKERY": 18,
+      "PET_CAFE": 21
+    },
+    "first_berry": 3,
+    "first_milk": 3,
+    "first_pizza": 15,
+    "lands": [
+      [
+        6,
+        22,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1552.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 13,
+        "MELON": 11,
+        "WHEAT": 7
+      },
+      "animals": {
+        "COW": 3,
+        "SHEEP": 2
+      },
+      "empty": 14,
+      "weeds": 0,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "YARN_STORE"
+      ]
+    },
+    "d20": {
+      "money": 31807.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 33,
+        "WHEAT": 8
+      },
+      "animals": {
+        "SHEEP": 3,
+        "COW": 3
+      },
+      "empty": 1,
+      "weeds": 1,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "YARN_STORE",
+        "YARN_STORE",
+        "PIZZA_SHOP",
+        "BAKERY"
+      ]
+    },
+    "d29": {
+      "money": 70641.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 21
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 2
+      },
+      "empty": 19,
+      "weeds": 3,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "YARN_STORE",
+        "YARN_STORE",
+        "PIZZA_SHOP",
+        "BAKERY",
+        "PET_CAFE",
+        "BAKERY"
+      ]
+    }
+  },
+  {
+    "seed": 1055941047,
+    "us": 70054,
+    "starter": 3472,
+    "shop_days": {
+      "BAKERY": 3,
+      "PIZZA_SHOP": 6,
+      "BRUNCH_SPOT": 9,
+      "ICE_CREAM_SHOP": 15,
+      "PET_CAFE": 18,
+      "FARMERS_MARKET": 21,
+      "SMOOTHIE_SHOP": 24
+    },
+    "first_berry": 9,
+    "first_milk": 6,
+    "first_pizza": 6,
+    "lands": [
+      [
+        6,
+        20,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1546.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "MELON": 12,
+        "WHEAT": 9,
+        "TOMATO": 5,
+        "STRAWBERRY": 8
+      },
+      "animals": {
+        "COW": 5,
+        "SHEEP": 2
+      },
+      "empty": 9,
+      "weeds": 0,
+      "shops": [
+        "BAKERY",
+        "PIZZA_SHOP",
+        "BRUNCH_SPOT"
+      ]
+    },
+    "d20": {
+      "money": 25158.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 22,
+        "WHEAT": 9,
+        "TOMATO": 1
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 5
+      },
+      "empty": 2,
+      "weeds": 8,
+      "shops": [
+        "BAKERY",
+        "PIZZA_SHOP",
+        "BRUNCH_SPOT",
+        "PIZZA_SHOP",
+        "ICE_CREAM_SHOP",
+        "PET_CAFE"
+      ]
+    },
+    "d29": {
+      "money": 67072.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 6,
+        "CARROT": 3
+      },
+      "animals": {
+        "SHEEP": 1,
+        "COW": 5
+      },
+      "empty": 22,
+      "weeds": 11,
+      "shops": [
+        "BAKERY",
+        "PIZZA_SHOP",
+        "BRUNCH_SPOT",
+        "PIZZA_SHOP",
+        "ICE_CREAM_SHOP",
+        "PET_CAFE",
+        "FARMERS_MARKET",
+        "SMOOTHIE_SHOP"
+      ]
+    }
+  },
+  {
+    "seed": 466183955,
+    "us": 74289,
+    "starter": 3500,
+    "shop_days": {
+      "ICE_CREAM_SHOP": 3,
+      "BRUNCH_SPOT": 6,
+      "FARMERS_MARKET": 12,
+      "PIZZA_SHOP": 18,
+      "SMOOTHIE_SHOP": 21,
+      "BAKERY": 24
+    },
+    "first_berry": 3,
+    "first_milk": 3,
+    "first_pizza": 18,
+    "lands": [
+      [
+        6,
+        18,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1585.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "WHEAT": 7,
+        "MELON": 11,
+        "STRAWBERRY": 16
+      },
+      "animals": {
+        "COW": 4,
+        "SHEEP": 2
+      },
+      "empty": 10,
+      "weeds": 0,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "BRUNCH_SPOT",
+        "BRUNCH_SPOT"
+      ]
+    },
+    "d20": {
+      "money": 29027.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "WHEAT": 9,
+        "STRAWBERRY": 22
+      },
+      "animals": {
+        "COW": 6,
+        "SHEEP": 2
+      },
+      "empty": 8,
+      "weeds": 3,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "BRUNCH_SPOT",
+        "BRUNCH_SPOT",
+        "FARMERS_MARKET",
+        "FARMERS_MARKET",
+        "PIZZA_SHOP"
+      ]
+    },
+    "d29": {
+      "money": 71852.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 22
+      },
+      "animals": {
+        "COW": 4,
+        "SHEEP": 2
+      },
+      "empty": 16,
+      "weeds": 4,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "BRUNCH_SPOT",
+        "BRUNCH_SPOT",
+        "FARMERS_MARKET",
+        "FARMERS_MARKET",
+        "PIZZA_SHOP",
+        "SMOOTHIE_SHOP",
+        "BAKERY"
+      ]
+    }
+  },
+  {
+    "seed": 1678164798,
+    "us": 56745,
+    "starter": 3734,
+    "shop_days": {
+      "PET_CAFE": 3,
+      "BAKERY": 9,
+      "BRUNCH_SPOT": 15,
+      "SMOOTHIE_SHOP": 18,
+      "ICE_CREAM_SHOP": 21
+    },
+    "first_berry": 15,
+    "first_milk": 18,
+    "first_pizza": null,
+    "lands": [
+      [
+        6,
+        22,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 4743.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "CARROT": 14,
+        "MELON": 12,
+        "WHEAT": 8
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 2
+      },
+      "empty": 12,
+      "weeds": 0,
+      "shops": [
+        "PET_CAFE",
+        "PET_CAFE",
+        "BAKERY"
+      ]
+    },
+    "d20": {
+      "money": 24890.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 24,
+        "MELON": 11,
+        "WHEAT": 5
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 2
+      },
+      "empty": 3,
+      "weeds": 3,
+      "shops": [
+        "PET_CAFE",
+        "PET_CAFE",
+        "BAKERY",
+        "BAKERY",
+        "BRUNCH_SPOT",
+        "SMOOTHIE_SHOP"
+      ]
+    },
+    "d29": {
+      "money": 52689.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 38
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 1
+      },
+      "empty": 7,
+      "weeds": 1,
+      "shops": [
+        "PET_CAFE",
+        "PET_CAFE",
+        "BAKERY",
+        "BAKERY",
+        "BRUNCH_SPOT",
+        "SMOOTHIE_SHOP",
+        "ICE_CREAM_SHOP",
+        "BRUNCH_SPOT"
+      ]
+    }
+  },
+  {
+    "seed": 1764305588,
+    "us": 91936,
+    "starter": 3547,
+    "shop_days": {
+      "PIZZA_SHOP": 3,
+      "FARMERS_MARKET": 6,
+      "ICE_CREAM_SHOP": 9,
+      "PET_CAFE": 18,
+      "SMOOTHIE_SHOP": 21,
+      "BAKERY": 24
+    },
+    "first_berry": 6,
+    "first_milk": 3,
+    "first_pizza": 3,
+    "lands": [
+      [
+        6,
+        21,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1529.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "WHEAT": 7,
+        "MELON": 11,
+        "STRAWBERRY": 13
+      },
+      "animals": {
+        "COW": 3,
+        "SHEEP": 2
+      },
+      "empty": 13,
+      "weeds": 1,
+      "shops": [
+        "PIZZA_SHOP",
+        "FARMERS_MARKET",
+        "ICE_CREAM_SHOP"
+      ]
+    },
+    "d20": {
+      "money": 25413.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 28,
+        "WHEAT": 9
+      },
+      "animals": {
+        "COW": 8,
+        "SHEEP": 2
+      },
+      "empty": 2,
+      "weeds": 1,
+      "shops": [
+        "PIZZA_SHOP",
+        "FARMERS_MARKET",
+        "ICE_CREAM_SHOP",
+        "ICE_CREAM_SHOP",
+        "PIZZA_SHOP",
+        "PET_CAFE"
+      ]
+    },
+    "d29": {
+      "money": 86794.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 6
+      },
+      "animals": {
+        "COW": 7,
+        "SHEEP": 2
+      },
+      "empty": 26,
+      "weeds": 8,
+      "shops": [
+        "PIZZA_SHOP",
+        "FARMERS_MARKET",
+        "ICE_CREAM_SHOP",
+        "ICE_CREAM_SHOP",
+        "PIZZA_SHOP",
+        "PET_CAFE",
+        "SMOOTHIE_SHOP",
+        "BAKERY"
+      ]
+    }
+  },
+  {
+    "seed": 214408169,
+    "us": 88987,
+    "starter": 3431,
+    "shop_days": {
+      "ICE_CREAM_SHOP": 3,
+      "SMOOTHIE_SHOP": 9,
+      "BAKERY": 12,
+      "FARMERS_MARKET": 21,
+      "BRUNCH_SPOT": 24
+    },
+    "first_berry": 3,
+    "first_milk": 3,
+    "first_pizza": null,
+    "lands": [
+      [
+        6,
+        22,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1552.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 13,
+        "MELON": 11,
+        "WHEAT": 7
+      },
+      "animals": {
+        "COW": 3,
+        "SHEEP": 2
+      },
+      "empty": 14,
+      "weeds": 0,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP"
+      ]
+    },
+    "d20": {
+      "money": 28695.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 25,
+        "WHEAT": 10
+      },
+      "animals": {
+        "COW": 7,
+        "SHEEP": 2
+      },
+      "empty": 3,
+      "weeds": 2,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "BAKERY",
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP"
+      ]
+    },
+    "d29": {
+      "money": 85757.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 19
+      },
+      "animals": {
+        "COW": 4,
+        "SHEEP": 2
+      },
+      "empty": 14,
+      "weeds": 7,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "BAKERY",
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "FARMERS_MARKET",
+        "BRUNCH_SPOT"
+      ]
+    }
+  },
+  {
+    "seed": 1493493436,
+    "us": 88737,
+    "starter": 3504,
+    "shop_days": {
+      "ICE_CREAM_SHOP": 3,
+      "SMOOTHIE_SHOP": 6,
+      "PIZZA_SHOP": 9,
+      "YARN_STORE": 12,
+      "PET_CAFE": 15,
+      "FARMERS_MARKET": 18,
+      "BAKERY": 24
+    },
+    "first_berry": 3,
+    "first_milk": 3,
+    "first_pizza": 9,
+    "lands": [
+      [
+        6,
+        16,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1540.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 13,
+        "MELON": 9,
+        "WHEAT": 7
+      },
+      "animals": {
+        "COW": 3,
+        "SHEEP": 2
+      },
+      "empty": 14,
+      "weeds": 2,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "PIZZA_SHOP"
+      ]
+    },
+    "d20": {
+      "money": 29500.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 36,
+        "WHEAT": 8
+      },
+      "animals": {
+        "COW": 4,
+        "SHEEP": 2
+      },
+      "empty": 0,
+      "weeds": 0,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "PIZZA_SHOP",
+        "YARN_STORE",
+        "PET_CAFE",
+        "FARMERS_MARKET"
+      ]
+    },
+    "d29": {
+      "money": 84758.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 15
+      },
+      "animals": {
+        "COW": 4,
+        "SHEEP": 2
+      },
+      "empty": 21,
+      "weeds": 8,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "PIZZA_SHOP",
+        "YARN_STORE",
+        "PET_CAFE",
+        "FARMERS_MARKET",
+        "SMOOTHIE_SHOP",
+        "BAKERY"
+      ]
+    }
+  },
+  {
+    "seed": 42,
+    "us": 78096,
+    "starter": 3758,
+    "shop_days": {
+      "ICE_CREAM_SHOP": 3,
+      "PET_CAFE": 6,
+      "BRUNCH_SPOT": 12,
+      "YARN_STORE": 21
+    },
+    "first_berry": 3,
+    "first_milk": 3,
+    "first_pizza": null,
+    "lands": [
+      [
+        7,
+        1,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1506.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "MELON": 11,
+        "STRAWBERRY": 13,
+        "WHEAT": 7
+      },
+      "animals": {
+        "COW": 3,
+        "SHEEP": 2
+      },
+      "empty": 14,
+      "weeds": 0,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "PET_CAFE",
+        "PET_CAFE"
+      ]
+    },
+    "d20": {
+      "money": 26635.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 32,
+        "WHEAT": 7
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 5
+      },
+      "empty": 3,
+      "weeds": 0,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "PET_CAFE",
+        "PET_CAFE",
+        "BRUNCH_SPOT",
+        "ICE_CREAM_SHOP",
+        "BRUNCH_SPOT"
+      ]
+    },
+    "d29": {
+      "money": 74719.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 28
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 5
+      },
+      "empty": 9,
+      "weeds": 5,
+      "shops": [
+        "ICE_CREAM_SHOP",
+        "PET_CAFE",
+        "PET_CAFE",
+        "BRUNCH_SPOT",
+        "ICE_CREAM_SHOP",
+        "BRUNCH_SPOT",
+        "YARN_STORE",
+        "PET_CAFE"
+      ]
+    }
+  },
+  {
+    "seed": 100,
+    "us": 88507,
+    "starter": 3483,
+    "shop_days": {
+      "PIZZA_SHOP": 3,
+      "SMOOTHIE_SHOP": 6,
+      "BRUNCH_SPOT": 9,
+      "PET_CAFE": 18,
+      "BAKERY": 24
+    },
+    "first_berry": 6,
+    "first_milk": 3,
+    "first_pizza": 3,
+    "lands": [
+      [
+        6,
+        21,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1550.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "WHEAT": 8,
+        "MELON": 11,
+        "STRAWBERRY": 7
+      },
+      "animals": {
+        "COW": 4,
+        "SHEEP": 2
+      },
+      "empty": 17,
+      "weeds": 1,
+      "shops": [
+        "PIZZA_SHOP",
+        "SMOOTHIE_SHOP",
+        "BRUNCH_SPOT"
+      ]
+    },
+    "d20": {
+      "money": 33776.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 23,
+        "WHEAT": 11
+      },
+      "animals": {
+        "COW": 8,
+        "SHEEP": 2
+      },
+      "empty": 3,
+      "weeds": 2,
+      "shops": [
+        "PIZZA_SHOP",
+        "SMOOTHIE_SHOP",
+        "BRUNCH_SPOT",
+        "SMOOTHIE_SHOP",
+        "PIZZA_SHOP",
+        "PET_CAFE"
+      ]
+    },
+    "d29": {
+      "money": 83510.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "CARROT": 6,
+        "STRAWBERRY": 12
+      },
+      "animals": {
+        "COW": 5,
+        "SHEEP": 1
+      },
+      "empty": 19,
+      "weeds": 2,
+      "shops": [
+        "PIZZA_SHOP",
+        "SMOOTHIE_SHOP",
+        "BRUNCH_SPOT",
+        "SMOOTHIE_SHOP",
+        "PIZZA_SHOP",
+        "PET_CAFE",
+        "PET_CAFE",
+        "BAKERY"
+      ]
+    }
+  },
+  {
+    "seed": 777,
+    "us": 81567,
+    "starter": 3648,
+    "shop_days": {
+      "BAKERY": 3,
+      "FARMERS_MARKET": 6,
+      "PET_CAFE": 9,
+      "PIZZA_SHOP": 12,
+      "ICE_CREAM_SHOP": 15,
+      "SMOOTHIE_SHOP": 18,
+      "YARN_STORE": 24
+    },
+    "first_berry": 6,
+    "first_milk": 12,
+    "first_pizza": 12,
+    "lands": [
+      [
+        6,
+        20,
+        2
+      ]
+    ],
+    "d10": {
+      "money": 1548.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "WHEAT": 6,
+        "MELON": 12,
+        "STRAWBERRY": 16
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 2
+      },
+      "empty": 12,
+      "weeds": 0,
+      "shops": [
+        "BAKERY",
+        "FARMERS_MARKET",
+        "PET_CAFE"
+      ]
+    },
+    "d20": {
+      "money": 25760.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 35,
+        "WHEAT": 7
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 4
+      },
+      "empty": 1,
+      "weeds": 1,
+      "shops": [
+        "BAKERY",
+        "FARMERS_MARKET",
+        "PET_CAFE",
+        "PIZZA_SHOP",
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP"
+      ]
+    },
+    "d29": {
+      "money": 74946.0,
+      "hands": 1,
+      "n_quads": 2,
+      "crops": {
+        "STRAWBERRY": 15
+      },
+      "animals": {
+        "SHEEP": 2,
+        "COW": 5
+      },
+      "empty": 25,
+      "weeds": 3,
+      "shops": [
+        "BAKERY",
+        "FARMERS_MARKET",
+        "PET_CAFE",
+        "PIZZA_SHOP",
+        "ICE_CREAM_SHOP",
+        "SMOOTHIE_SHOP",
+        "FARMERS_MARKET",
+        "YARN_STORE"
+      ]
+    }
+  }
+]
