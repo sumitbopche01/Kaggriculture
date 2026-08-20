@@ -101,6 +101,70 @@ TUNE_SEEDS_EXTRA_30 = [
     14,
 ]
 TUNE_SEEDS_60 = TUNE_SEEDS_30 + TUNE_SEEDS_EXTRA_30
+# Extra 60: Kaggle last3 / miss-seed coverage + holdout shop diversity.
+TUNE_SEEDS_EXTRA_60 = [
+    0,
+    37514770,
+    96823174,
+    102771766,
+    104793062,
+    137383801,
+    177371887,
+    201109396,
+    212801414,
+    214408169,
+    269540093,
+    316945216,
+    343635847,
+    360922415,
+    375954346,
+    384976034,
+    402898773,
+    406050412,
+    409488828,
+    439973987,
+    466183955,
+    510360931,
+    538446151,
+    576467774,
+    677151940,
+    687822168,
+    697247901,
+    714754495,
+    796493074,
+    897688219,
+    933171150,
+    958183153,
+    1042860465,
+    1043041600,
+    1055941047,
+    1163631300,
+    1210701737,
+    1245111266,
+    1279909885,
+    1331251194,
+    1360331963,
+    1371318646,
+    1373792371,
+    1386607876,
+    1396284857,
+    1397505211,
+    1440364774,
+    1470163932,
+    1493493436,
+    1506490507,
+    1511764748,
+    1514404541,
+    1532410732,
+    1603554153,
+    1606600003,
+    1611947564,
+    1613212566,
+    1673247076,
+    1678164798,
+    1740485088,
+]
+TUNE_SEEDS_120 = TUNE_SEEDS_60 + TUNE_SEEDS_EXTRA_60
 
 
 def run_vs_starter(seed: int, *, episode_steps: int = 720) -> tuple[int, int]:
@@ -149,7 +213,7 @@ def main() -> None:
         "--seedSet",
         type=str,
         default="tune60",
-        choices=["mean15", "tune30", "tune60"],
+        choices=["mean15", "tune30", "tune60", "tune120"],
     )
     p.add_argument("--seedCount", type=int, default=60)
     args = p.parse_args()
@@ -158,13 +222,22 @@ def main() -> None:
         seeds_src = MEAN_SEEDS_15
     elif args.seedSet == "tune30":
         seeds_src = TUNE_SEEDS_30
+    elif args.seedSet == "tune120":
+        seeds_src = TUNE_SEEDS_120
     else:
         seeds_src = TUNE_SEEDS_60
-    seeds = seeds_src[: args.seedCount]
+    seeds = seeds_src[: args.seedCount or len(seeds_src)]
     mean, rows = evaluate_seeds(seeds, episode_steps=args.episodeSteps)
     for seed, us, starter in rows:
         print(seed, us, starter)
     print("mean", mean)
+    scores = [us for _, us, _ in rows]
+    scores_sorted = sorted(scores)
+    n = len(scores_sorted)
+    print("n", n)
+    print("min", scores_sorted[0], "p10", scores_sorted[max(0, n // 10 - 1)], "median", scores_sorted[n // 2], "p90", scores_sorted[min(n - 1, (9 * n) // 10)], "max", scores_sorted[-1])
+    worst = sorted(rows, key=lambda r: r[1])[:10]
+    print("worst10", [(s, us) for s, us, _ in worst])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,228 @@
+{
+  "ALL": {
+    "n": 29,
+    "median_reward": 93650.0,
+    "median_land1_day": 6.0,
+    "median_land2_day": 11.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 0.8620689655172413,
+    "median_peak_hands": 12.0,
+    "median_first_full_crew_day": 8.0,
+    "median_dump_day": 28.0,
+    "median_late_sell_share": 0.35159010600706714,
+    "median_cows_peak": 10.0,
+    "median_berry_peak": 22.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 20.0,
+    "share_melon_day0": 0.6896551724137931,
+    "hire_curve_median": {
+      "0": 5.0,
+      "1": 3.0,
+      "2": 5.0,
+      "3": 5.0,
+      "4": 5.0,
+      "5": 4.0,
+      "6": 6.0,
+      "7": 8.0,
+      "8": 9.0,
+      "9": 10.0,
+      "10": 10.0,
+      "11": 11.0,
+      "12": 11.0,
+      "13": 11.0,
+      "14": 11.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 12.0
+    },
+    "top_winners": [
+      {
+        "episode": 95198565,
+        "seed": 104793062,
+        "name": "kay.liechtenstein",
+        "reward": 162448.0,
+        "land_days": [
+          6,
+          11
+        ],
+        "cows": 10,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 21
+      },
+      {
+        "episode": 94241330,
+        "seed": 2119622091,
+        "name": "ReCurSiON",
+        "reward": 125552.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 9,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 95182614,
+        "seed": 2054328205,
+        "name": "yindujuxi",
+        "reward": 122692.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 10,
+        "berry": 37,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 94267916,
+        "seed": 993781610,
+        "name": "Kiran Kumar",
+        "reward": 109330.0,
+        "land_days": [
+          0,
+          11
+        ],
+        "cows": 7,
+        "berry": 17,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 95180315,
+        "seed": 1210701737,
+        "name": "Tergel Munkhbat",
+        "reward": 108665.0,
+        "land_days": [
+          8,
+          10,
+          11
+        ],
+        "cows": 8,
+        "berry": 53,
+        "tomato": 0,
+        "dump_day": 29
+      }
+    ]
+  },
+  "BERRY": {
+    "n": 29,
+    "median_reward": 93650.0,
+    "median_land1_day": 6.0,
+    "median_land2_day": 11.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 0.8620689655172413,
+    "median_peak_hands": 12.0,
+    "median_first_full_crew_day": 8.0,
+    "median_dump_day": 28.0,
+    "median_late_sell_share": 0.35159010600706714,
+    "median_cows_peak": 10.0,
+    "median_berry_peak": 22.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 20.0,
+    "share_melon_day0": 0.6896551724137931,
+    "hire_curve_median": {
+      "0": 5.0,
+      "1": 3.0,
+      "2": 5.0,
+      "3": 5.0,
+      "4": 5.0,
+      "5": 4.0,
+      "6": 6.0,
+      "7": 8.0,
+      "8": 9.0,
+      "9": 10.0,
+      "10": 10.0,
+      "11": 11.0,
+      "12": 11.0,
+      "13": 11.0,
+      "14": 11.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 12.0
+    },
+    "top_winners": [
+      {
+        "episode": 95198565,
+        "seed": 104793062,
+        "name": "kay.liechtenstein",
+        "reward": 162448.0,
+        "land_days": [
+          6,
+          11
+        ],
+        "cows": 10,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 21
+      },
+      {
+        "episode": 94241330,
+        "seed": 2119622091,
+        "name": "ReCurSiON",
+        "reward": 125552.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 9,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 95182614,
+        "seed": 2054328205,
+        "name": "yindujuxi",
+        "reward": 122692.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 10,
+        "berry": 37,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 94267916,
+        "seed": 993781610,
+        "name": "Kiran Kumar",
+        "reward": 109330.0,
+        "land_days": [
+          0,
+          11
+        ],
+        "cows": 7,
+        "berry": 17,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 95180315,
+        "seed": 1210701737,
+        "name": "Tergel Munkhbat",
+        "reward": 108665.0,
+        "land_days": [
+          8,
+          10,
+          11
+        ],
+        "cows": 8,
+        "berry": 53,
+        "tomato": 0,
+        "dump_day": 29
+      }
+    ]
+  }
+}

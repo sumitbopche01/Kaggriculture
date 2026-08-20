@@ -1,0 +1,312 @@
+{
+  "ALL": {
+    "n": 50,
+    "median_reward": 152284.0,
+    "median_land1_day": 6.0,
+    "median_land2_day": 10.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 1.0,
+    "median_peak_hands": 13.0,
+    "median_first_full_crew_day": 8.0,
+    "median_dump_day": 28.0,
+    "median_late_sell_share": 0.406570841889117,
+    "median_cows_peak": 8.0,
+    "median_berry_peak": 35.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 36.0,
+    "share_melon_day0": 1.0,
+    "hire_curve_median": {
+      "0": 5.0,
+      "1": 1.0,
+      "2": 4.0,
+      "3": 5.0,
+      "4": 5.0,
+      "5": 4.0,
+      "6": 4.0,
+      "7": 8.0,
+      "8": 8.5,
+      "9": 11.0,
+      "10": 12.0,
+      "11": 12.0,
+      "12": 10.0,
+      "13": 11.0,
+      "14": 9.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 13.0
+    },
+    "top_winners": [
+      {
+        "episode": 88112537,
+        "seed": 54321,
+        "name": "top10_read",
+        "reward": 190752.0,
+        "land_days": [
+          6,
+          11
+        ],
+        "cows": 10,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 21
+      },
+      {
+        "episode": 54726488,
+        "seed": 1584566076,
+        "name": "boatlee_v16",
+        "reward": 188303.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 8,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 91970928,
+        "seed": 1584566076,
+        "name": "frontier_soil",
+        "reward": 187682.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 8,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 79505577,
+        "seed": 1606600003,
+        "name": "top10_read",
+        "reward": 187480.0,
+        "land_days": [
+          6,
+          11,
+          12
+        ],
+        "cows": 6,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 21
+      },
+      {
+        "episode": 26262098,
+        "seed": 1279909885,
+        "name": "top10_read",
+        "reward": 187416.0,
+        "land_days": [
+          6,
+          11
+        ],
+        "cows": 10,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 21
+      }
+    ]
+  },
+  "BERRY": {
+    "n": 47,
+    "median_reward": 154935.0,
+    "median_land1_day": 6.0,
+    "median_land2_day": 10.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 1.0,
+    "median_peak_hands": 13.0,
+    "median_first_full_crew_day": 8.0,
+    "median_dump_day": 28.0,
+    "median_late_sell_share": 0.406570841889117,
+    "median_cows_peak": 8.0,
+    "median_berry_peak": 35.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 36.0,
+    "share_melon_day0": 1.0,
+    "hire_curve_median": {
+      "0": 5.0,
+      "1": 1.0,
+      "2": 4.0,
+      "3": 5.0,
+      "4": 5.0,
+      "5": 4.0,
+      "6": 4.0,
+      "7": 8.0,
+      "8": 8.0,
+      "9": 11.0,
+      "10": 12.0,
+      "11": 12.0,
+      "12": 10.0,
+      "13": 11.0,
+      "14": 9.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 13.0
+    },
+    "top_winners": [
+      {
+        "episode": 88112537,
+        "seed": 54321,
+        "name": "top10_read",
+        "reward": 190752.0,
+        "land_days": [
+          6,
+          11
+        ],
+        "cows": 10,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 21
+      },
+      {
+        "episode": 54726488,
+        "seed": 1584566076,
+        "name": "boatlee_v16",
+        "reward": 188303.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 8,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 91970928,
+        "seed": 1584566076,
+        "name": "frontier_soil",
+        "reward": 187682.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 8,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 79505577,
+        "seed": 1606600003,
+        "name": "top10_read",
+        "reward": 187480.0,
+        "land_days": [
+          6,
+          11,
+          12
+        ],
+        "cows": 6,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 21
+      },
+      {
+        "episode": 26262098,
+        "seed": 1279909885,
+        "name": "top10_read",
+        "reward": 187416.0,
+        "land_days": [
+          6,
+          11
+        ],
+        "cows": 10,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 21
+      }
+    ]
+  },
+  "MIXED": {
+    "n": 3,
+    "median_reward": 116433.0,
+    "median_land1_day": 7.0,
+    "median_land2_day": 10.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 1.0,
+    "median_peak_hands": 13.0,
+    "median_first_full_crew_day": 6.0,
+    "median_dump_day": 28.0,
+    "median_late_sell_share": 0.6162663755458515,
+    "median_cows_peak": 11.0,
+    "median_berry_peak": 32.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 7.0,
+    "share_melon_day0": 1.0,
+    "hire_curve_median": {
+      "0": 9.0,
+      "1": 7.0,
+      "2": 8.0,
+      "3": 9.0,
+      "4": 8.0,
+      "5": 9.0,
+      "6": 10.0,
+      "7": 10.0,
+      "8": 9.0,
+      "9": 11.0,
+      "10": 11.0,
+      "11": 12.0,
+      "12": 12.0,
+      "13": 12.0,
+      "14": 12.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 13.0
+    },
+    "top_winners": [
+      {
+        "episode": 69217214,
+        "seed": 9999,
+        "name": "structured",
+        "reward": 139618.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 11,
+        "berry": 32,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 67851668,
+        "seed": 1584566076,
+        "name": "hamburger",
+        "reward": 116433.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 8,
+        "berry": 40,
+        "tomato": 0,
+        "dump_day": 12
+      },
+      {
+        "episode": 72590803,
+        "seed": 714754495,
+        "name": "structured",
+        "reward": 116046.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 12,
+        "berry": 31,
+        "tomato": 0,
+        "dump_day": 28
+      }
+    ]
+  }
+}
