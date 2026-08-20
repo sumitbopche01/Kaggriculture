@@ -1,0 +1,226 @@
+{
+  "ALL": {
+    "n": 5,
+    "median_reward": 88100.0,
+    "median_land1_day": 7.0,
+    "median_land2_day": 10.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 1.0,
+    "median_peak_hands": 12.0,
+    "median_first_full_crew_day": 7.0,
+    "median_dump_day": 29.0,
+    "median_late_sell_share": 0.3807599029911075,
+    "median_cows_peak": 6.0,
+    "median_berry_peak": 32.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 42.0,
+    "share_melon_day0": 0.4,
+    "hire_curve_median": {
+      "0": 6.0,
+      "1": 7.0,
+      "2": 7.0,
+      "3": 7.0,
+      "4": 8.0,
+      "5": 7.0,
+      "6": 7.0,
+      "7": 11.0,
+      "8": 9.0,
+      "9": 9.0,
+      "10": 10.0,
+      "11": 10.0,
+      "12": 11.0,
+      "13": 12.0,
+      "14": 12.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 12.0
+    },
+    "top_winners": [
+      {
+        "episode": 94241330,
+        "seed": 2119622091,
+        "name": "ReCurSiON",
+        "reward": 125552.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 9,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 94260897,
+        "seed": 1184506744,
+        "name": "Crop Dusta",
+        "reward": 88272.0,
+        "land_days": [
+          5,
+          8
+        ],
+        "cows": 4,
+        "berry": 25,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 94247835,
+        "seed": 757227658,
+        "name": "tetsuya",
+        "reward": 88100.0,
+        "land_days": [
+          7,
+          9
+        ],
+        "cows": 4,
+        "berry": 30,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 94247823,
+        "seed": 1295704409,
+        "name": "tetsuya",
+        "reward": 84889.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 6,
+        "berry": 40,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 94208933,
+        "seed": 2100766527,
+        "name": "tetsuya",
+        "reward": 52081.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 6,
+        "berry": 32,
+        "tomato": 0,
+        "dump_day": 29
+      }
+    ]
+  },
+  "BERRY": {
+    "n": 5,
+    "median_reward": 88100.0,
+    "median_land1_day": 7.0,
+    "median_land2_day": 10.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 1.0,
+    "median_peak_hands": 12.0,
+    "median_first_full_crew_day": 7.0,
+    "median_dump_day": 29.0,
+    "median_late_sell_share": 0.3807599029911075,
+    "median_cows_peak": 6.0,
+    "median_berry_peak": 32.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 42.0,
+    "share_melon_day0": 0.4,
+    "hire_curve_median": {
+      "0": 6.0,
+      "1": 7.0,
+      "2": 7.0,
+      "3": 7.0,
+      "4": 8.0,
+      "5": 7.0,
+      "6": 7.0,
+      "7": 11.0,
+      "8": 9.0,
+      "9": 9.0,
+      "10": 10.0,
+      "11": 10.0,
+      "12": 11.0,
+      "13": 12.0,
+      "14": 12.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 12.0
+    },
+    "top_winners": [
+      {
+        "episode": 94241330,
+        "seed": 2119622091,
+        "name": "ReCurSiON",
+        "reward": 125552.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 9,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 94260897,
+        "seed": 1184506744,
+        "name": "Crop Dusta",
+        "reward": 88272.0,
+        "land_days": [
+          5,
+          8
+        ],
+        "cows": 4,
+        "berry": 25,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 94247835,
+        "seed": 757227658,
+        "name": "tetsuya",
+        "reward": 88100.0,
+        "land_days": [
+          7,
+          9
+        ],
+        "cows": 4,
+        "berry": 30,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 94247823,
+        "seed": 1295704409,
+        "name": "tetsuya",
+        "reward": 84889.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 6,
+        "berry": 40,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 94208933,
+        "seed": 2100766527,
+        "name": "tetsuya",
+        "reward": 52081.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 6,
+        "berry": 32,
+        "tomato": 0,
+        "dump_day": 29
+      }
+    ]
+  }
+}

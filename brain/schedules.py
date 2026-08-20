@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PATH = ROOT / "analysis" / "schedules_by_archetype.json"
+# Prefer elite external winners (top5 + $70k+ non-self) over the
+# self-polluted ladder dump when both exist.
+_ELITE = ROOT / "analysis" / "schedules_by_archetype_elite.json"
+_DEFAULT = ROOT / "analysis" / "schedules_by_archetype.json"
+DEFAULT_PATH = _ELITE if _ELITE.is_file() else _DEFAULT
 
 
 @lru_cache(maxsize=1)

@@ -404,16 +404,53 @@ def diff_our_agent(rows: list[EpisodeSchedule], limit: int = 6) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _collect_paths(dirs: list[str]) -> list[Path]:
+    paths: list[Path] = []
+    for d in dirs:
+        base = Path(d)
+        if not base.is_absolute():
+            base = ROOT / base
+        paths.extend(sorted(base.glob("episode-*-replay.json")))
+    seen: set[str] = set()
+    out: list[Path] = []
+    for p in paths:
+        if p.name in seen:
+            continue
+        seen.add(p.name)
+        out.append(p)
+    return out
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
+    p.add_argument(
+        "--dirs",
+        nargs="+",
+        default=["replays"],
+        help="Replay folders relative to repo root (e.g. replays/top5 replays/v2)",
+    )
+    p.add_argument(
+        "--exclude-winner-substr",
+        nargs="*",
+        default=[],
+        help="Drop episodes whose winner name contains any of these (case-insensitive)",
+    )
+    p.add_argument("--min-reward", type=float, default=0.0)
+    p.add_argument(
+        "--tag",
+        type=str,
+        default="",
+        help="Suffix for output files, e.g. top5 → schedules_raw_top5.jsonl",
+    )
     p.add_argument("--diff-us", action="store_true", help="Compare to local agent on top seeds")
-    p.add_argument("--diff-limit", type=int, default=5)
+    p.add_argument("--diff-limit", type=int, default=8)
     args = p.parse_args()
 
-    paths = sorted(REPLAY_DIR.glob("episode-*-replay.json"))
+    paths = _collect_paths(list(args.dirs))
     if not paths:
-        raise SystemExit(f"No replays in {REPLAY_DIR}")
+        raise SystemExit(f"No replays in {args.dirs}")
 
+    excl = [s.lower() for s in args.exclude_winner_substr if s]
     rows: list[EpisodeSchedule] = []
     for path in paths:
         try:
@@ -423,28 +460,41 @@ def main() -> None:
             continue
         if sched is None:
             continue
+        if float(sched.reward_w) < float(args.min_reward):
+            print(f"skip {sched.episode_id}: reward {sched.reward_w:.0f} < {args.min_reward}")
+            continue
+        if excl and any(x in (sched.winner_name or "").lower() for x in excl):
+            print(f"skip {sched.episode_id}: excluded winner {sched.winner_name}")
+            continue
         rows.append(sched)
         print(
             f"{sched.episode_id} seed={sched.seed} {sched.archetype} "
-            f"${sched.reward_w:.0f} land={sched.land_days} cows={sched.cows_peak} "
-            f"berry={sched.berry_peak} dump=d{sched.dump_day}"
+            f"${sched.reward_w:.0f} [{sched.winner_name}] land={sched.land_days} "
+            f"cows={sched.cows_peak} berry={sched.berry_peak} mel0={sched.melon_seeds_day0} "
+            f"dump=d{sched.dump_day}"
         )
 
+    if not rows:
+        raise SystemExit("No episodes left after filters")
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    raw_path = OUT_DIR / "schedules_raw.jsonl"
+    suffix = f"_{args.tag}" if args.tag else ""
+    raw_path = OUT_DIR / f"schedules_raw{suffix}.jsonl"
+    agg_path = OUT_DIR / f"schedules_by_archetype{suffix}.json"
+    report_path = OUT_DIR / f"schedules_report{suffix}.md"
     with raw_path.open("w") as f:
         for r in rows:
             f.write(json.dumps(asdict(r)) + "\n")
 
     agg = aggregate(rows)
-    (OUT_DIR / "schedules_by_archetype.json").write_text(json.dumps(agg, indent=2))
-    report = render_report(rows, agg)
+    agg_path.write_text(json.dumps(agg, indent=2))
+    report = f"# Corpus: {', '.join(args.dirs)} (n={len(rows)})\n\n" + render_report(rows, agg)
     if args.diff_us:
         report += "\n" + diff_our_agent(rows, limit=args.diff_limit)
-    (OUT_DIR / "schedules_report.md").write_text(report)
+    report_path.write_text(report)
     print(f"\nWrote {raw_path}")
-    print(f"Wrote {OUT_DIR / 'schedules_by_archetype.json'}")
-    print(f"Wrote {OUT_DIR / 'schedules_report.md'}")
+    print(f"Wrote {agg_path}")
+    print(f"Wrote {report_path}")
 
 
 if __name__ == "__main__":

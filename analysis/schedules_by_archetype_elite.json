@@ -1,0 +1,226 @@
+{
+  "ALL": {
+    "n": 8,
+    "median_reward": 99392.5,
+    "median_land1_day": 6.0,
+    "median_land2_day": 10.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 1.0,
+    "median_peak_hands": 12.0,
+    "median_first_full_crew_day": 7.5,
+    "median_dump_day": 28.0,
+    "median_late_sell_share": 0.3767468840553797,
+    "median_cows_peak": 6.0,
+    "median_berry_peak": 35.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 34.5,
+    "share_melon_day0": 0.5,
+    "hire_curve_median": {
+      "0": 5.0,
+      "1": 4.0,
+      "2": 5.5,
+      "3": 6.0,
+      "4": 6.5,
+      "5": 5.5,
+      "6": 6.5,
+      "7": 9.0,
+      "8": 9.0,
+      "9": 9.5,
+      "10": 10.0,
+      "11": 10.0,
+      "12": 10.5,
+      "13": 12.0,
+      "14": 12.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 12.0
+    },
+    "top_winners": [
+      {
+        "episode": 94241330,
+        "seed": 2119622091,
+        "name": "ReCurSiON",
+        "reward": 125552.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 9,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 94228207,
+        "seed": 1941500822,
+        "name": "Soledad Santiago",
+        "reward": 104489.0,
+        "land_days": [
+          0,
+          9
+        ],
+        "cows": 8,
+        "berry": 28,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 94475899,
+        "seed": 456398262,
+        "name": "\u30ab\u30ef\u30b7\u30ae",
+        "reward": 101454.0,
+        "land_days": [
+          6,
+          11
+        ],
+        "cows": 6,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 15
+      },
+      {
+        "episode": 94233811,
+        "seed": 1012421698,
+        "name": "porsche zheng",
+        "reward": 100232.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 10,
+        "berry": 41,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 94492617,
+        "seed": 1571069459,
+        "name": "tetsuya",
+        "reward": 98553.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 6,
+        "berry": 39,
+        "tomato": 0,
+        "dump_day": 28
+      }
+    ]
+  },
+  "BERRY": {
+    "n": 8,
+    "median_reward": 99392.5,
+    "median_land1_day": 6.0,
+    "median_land2_day": 10.0,
+    "share_2plus_quads": 1.0,
+    "share_3plus_quads": 1.0,
+    "median_peak_hands": 12.0,
+    "median_first_full_crew_day": 7.5,
+    "median_dump_day": 28.0,
+    "median_late_sell_share": 0.3767468840553797,
+    "median_cows_peak": 6.0,
+    "median_berry_peak": 35.0,
+    "median_tomato_peak": 0.0,
+    "median_wheat_peak": 34.5,
+    "share_melon_day0": 0.5,
+    "hire_curve_median": {
+      "0": 5.0,
+      "1": 4.0,
+      "2": 5.5,
+      "3": 6.0,
+      "4": 6.5,
+      "5": 5.5,
+      "6": 6.5,
+      "7": 9.0,
+      "8": 9.0,
+      "9": 9.5,
+      "10": 10.0,
+      "11": 10.0,
+      "12": 10.5,
+      "13": 12.0,
+      "14": 12.0,
+      "15": 12.0,
+      "16": 12.0,
+      "17": 12.0,
+      "18": 12.0,
+      "19": 12.0,
+      "20": 12.0
+    },
+    "top_winners": [
+      {
+        "episode": 94241330,
+        "seed": 2119622091,
+        "name": "ReCurSiON",
+        "reward": 125552.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 9,
+        "berry": 36,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 94228207,
+        "seed": 1941500822,
+        "name": "Soledad Santiago",
+        "reward": 104489.0,
+        "land_days": [
+          0,
+          9
+        ],
+        "cows": 8,
+        "berry": 28,
+        "tomato": 0,
+        "dump_day": 29
+      },
+      {
+        "episode": 94475899,
+        "seed": 456398262,
+        "name": "\u30ab\u30ef\u30b7\u30ae",
+        "reward": 101454.0,
+        "land_days": [
+          6,
+          11
+        ],
+        "cows": 6,
+        "berry": 34,
+        "tomato": 0,
+        "dump_day": 15
+      },
+      {
+        "episode": 94233811,
+        "seed": 1012421698,
+        "name": "porsche zheng",
+        "reward": 100232.0,
+        "land_days": [
+          6,
+          10
+        ],
+        "cows": 10,
+        "berry": 41,
+        "tomato": 0,
+        "dump_day": 28
+      },
+      {
+        "episode": 94492617,
+        "seed": 1571069459,
+        "name": "tetsuya",
+        "reward": 98553.0,
+        "land_days": [
+          7,
+          10
+        ],
+        "cows": 6,
+        "berry": 39,
+        "tomato": 0,
+        "dump_day": 28
+      }
+    ]
+  }
+}

@@ -127,9 +127,7 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "wheat_filler_day_max": 20,
     "late_wheat_seed_buffer_day_min": 16,
     "late_wheat_seed_buffer": 2,
-    # Melon filler (only when berries exist)
-    # Replay winners open ~5–12 melon seeds on day 0; gate was n_quads>=3
-    # so bakery/yarn maps sat on wheat-only until FM and never filled board.
+    # Melon filler — bakery/yarn boards before berry demand.
     "melon_leftover_min": 4,
     "melon_n_quads_min": 1,
     "melon_day_max": 16,
@@ -1104,8 +1102,8 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
         plan[primary] = int(plan.get(primary, 0) or 0) + extra
         leftover -= extra
 
-    # Melon filler before berry demand — steal day-0 melon schedules from
-    # strong replays. Never after a berry shop opens (glut + water fight).
+    # Melon filler before berry demand — bakery schedules from replays.
+    # Day-0 opener is required for mean; do not globally defer melon for pizza.
     if (
         leftover >= int(PARAMS["melon_leftover_min"])
         and int(s["day"]) <= int(PARAMS["melon_day_max"])
