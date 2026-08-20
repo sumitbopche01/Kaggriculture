@@ -147,9 +147,9 @@ def primary_cash_crop(
     return None
 
 
-# Strawberries keep 8/28/48/60. Tomato primary is smaller so a pizza
-# map does not dump 28 tomatoes on day 8 and flip the town shops.
-TOMATO_PRIMARY_BASE = {1: 4, 2: 16, 3: 28, 4: 40}
+# Strawberries keep 8/28/48/60. Tomato primary denser on 2q so pizza maps
+# keep a real printer (seed 13 stalled at 16-tile caps while milk shops stacked).
+TOMATO_PRIMARY_BASE = {1: 6, 2: 24, 3: 36, 4: 48}
 
 
 def cash_tile_base(n_quads: int, *, primary: bool, crop: str | None = None) -> int:

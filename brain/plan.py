@@ -75,16 +75,23 @@ class TurnPlan:
     budget: TurnBudget | None = None
 
     @property
+    def plant_pressure(self) -> float:
+        """Empty (and plan gap) relative to hour plant slots — one field signal."""
+        b = self.budget
+        empty = float(b.empty if b is not None else 0)
+        slots = max(1.0, float(b.plantable if b is not None else 0))
+        pressure = empty / slots
+        gap = float(max(self.berry_gap, self.cash_gap))
+        if gap > 0:
+            pressure = max(pressure, gap / slots)
+        if self.flags.field_short:
+            pressure = max(pressure, 1.0)
+        return pressure
+
+    @property
     def fill_board(self) -> bool:
-        """Field workers prioritize planting/weeding when board must be filled."""
-        return (
-            self.flags.plant_sprint
-            or self.flags.berry_ramp
-            or self.flags.cash_ramp
-            or self.flags.berry_replant_push
-            or self.flags.field_short
-            or self.flags.board_fill_pressure
-        )
+        """Back-compat: prioritize planting when plant_pressure is at least 1."""
+        return self.plant_pressure >= 1.0
 
     @property
     def skip_animal_care(self) -> bool:
@@ -225,9 +232,7 @@ def resolve_defer_animals(
     strategy: MapStrategy = "UNKNOWN",
     params: dict[str, int | float] | None = None,
 ) -> bool:
-    return strategy_defer_animals(
-        strategy, s, flags, berry_gap, params or {}
-    )
+    return strategy_defer_animals(strategy, s, flags, berry_gap, params or {})
 
 
 def compute_sell_n(
@@ -339,9 +344,7 @@ def build_turn_plan(
     mode: Mode = "LIQUIDATE" if phase == "LIQUIDATE" else "ENGINE"
     profile = phase_profile(phase, params)
     market_route = resolve_market_route(phase, flags, mode=mode)
-    defer = resolve_defer_animals(
-        s, flags, berry_gap, strategy=strategy, params=params
-    )
+    defer = resolve_defer_animals(s, flags, berry_gap, strategy=strategy, params=params)
 
     plan = TurnPlan(
         phase=phase,

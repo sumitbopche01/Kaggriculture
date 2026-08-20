@@ -793,21 +793,21 @@ def wheat_stock(s: dict[str, Any]) -> int:
 
 
 def herd_can_expand(s: dict[str, Any]) -> bool:
+    """Expand when planted + stock cover the herd (thicker on milk-led boards)."""
     mouths = mouths_of(s)
     if mouths <= 0:
         return True
-    # Berry garnish cows: planted mouths is enough if seed+shed cover the buffer.
-    # Packed ice-cream boards kept W=5 while need was mouths+2 and never bought.
-    if engine_of(s) == "BERRY":
-        if int(s["crops"].get("WHEAT", 0) or 0) < mouths:
+    planted = int(s["crops"].get("WHEAT", 0) or 0)
+    milk_led = milk_sink(s) >= 1 and berry_sink(s) == 0
+    buffer = int(PARAMS["wheat_buffer_add"])
+    if milk_led:
+        if planted < mouths + 2:
             return False
-        return wheat_stock(s) >= mouths + int(PARAMS["wheat_buffer_add"])
-    need = mouths + (2 if milk_sink(s) >= 1 else 1)
-    if s["crops"].get("WHEAT", 0) < need:
+        return wheat_stock(s) >= mouths + 2
+    # Berry / ice cream garnish: mouths planted + stock for buffer.
+    if planted < mouths:
         return False
-    if wheat_stock(s) < mouths + 2:
-        return False
-    return True
+    return wheat_stock(s) >= mouths + buffer
 
 
 def egg_sink(s: dict[str, Any]) -> int:
@@ -1066,12 +1066,12 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
         # PRIMARY_TILE_BASE[3]=48 leaving ~15 tiles empty). Pizza leftover
         # still goes tomato-then-wheat below, not this branch.
         if (
-            engine_of(s) == "BERRY"
+            berry_sink(s) > 0
             and primary == "STRAWBERRY"
             and plan_viable(s, "STRAWBERRY")
         ):
             want = leftover
-        elif engine_of(s) == "BERRY" and primary == "STRAWBERRY":
+        elif berry_sink(s) > 0 and primary == "STRAWBERRY":
             want = max(want, have)
         take(primary, want)
 
@@ -1080,21 +1080,21 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
     if primary != "STRAWBERRY" and "STRAWBERRY" in cap_map:
         take("STRAWBERRY", cap_map["STRAWBERRY"])
 
-    # Milk leftover densifies tomatoes a little, then wheat. Unplanted
-    # leftover wheat was 12 empty tiles on 761083594.
-    if leftover > 0 and engine_of(s) == "MILK" and primary == "TOMATO":
+    # Milk-led leftover densifies primary a little, then wheat.
+    milk_led = milk_sink(s) >= 1 and berry_sink(s) == 0
+    if leftover > 0 and milk_led and primary and plan_viable(s, primary):
         extra = min(leftover, 8)
-        plan["TOMATO"] = int(plan.get("TOMATO", 0) or 0) + extra
+        plan[primary] = int(plan.get(primary, 0) or 0) + extra
         leftover -= extra
 
     # Feed leftover, never a second cash crop. Berry maps leave the hole
     # empty rather than flooding wheat over strawberries; only top up
     # wheat when the planted+seeded feed floor is still short of plan.
     if leftover > 0 and (
-        engine_of(s) == "MILK" or int(demand.get("STRAWBERRY", 0) or 0) == 0
+        milk_led or int(demand.get("STRAWBERRY", 0) or 0) == 0
     ):
         plan["WHEAT"] += leftover
-    elif leftover > 0 and engine_of(s) == "BERRY":
+    elif leftover > 0:
         mouths = mouths_of(s)
         feed_floor = mouths + int(PARAMS["wheat_buffer_add"]) if mouths else 0
         wheat_have = int(s["crops"].get("WHEAT", 0) or 0) + int(
@@ -1123,11 +1123,14 @@ def cash_caps(s: dict[str, Any]) -> tuple[int, int]:
 
 
 def want_cows(s: dict[str, Any]) -> int:
+    """Expand cows from shop target; berry path uses cow-vs-seed EV."""
     target = cow_target(s, PARAMS)
     floor = int(PARAMS["cow_floor"]) if s["day"] <= PARAMS["cow_floor_day_max"] else 0
     if s["cows"] < floor:
         return min(s["cows"] + 1, max(target, floor))
-    if engine_of(s) != "MILK":
+    # Milk-led = pizza densify (milk shops, no berry). Else ice-cream garnish.
+    milk_led = milk_sink(s) >= 1 and berry_sink(s) == 0
+    if not milk_led:
         if target > s["cows"] and s["n_quads"] >= 2 and herd_can_expand(s):
             primary = _primary_cash(s)
             budget = _turn_budget(s)
@@ -1143,7 +1146,7 @@ def want_cows(s: dict[str, Any]) -> int:
             ):
                 return min(s["cows"] + 1, target)
         return s["cows"]
-    pizza_1q = s["n_quads"] == 1 and milk_sink(s) >= 2 and berry_sink(s) == 0
+    pizza_1q = s["n_quads"] == 1 and milk_sink(s) >= 2
     if s["n_quads"] == 1 and not pizza_1q:
         return s["cows"]
     if not herd_can_expand(s):
@@ -1168,6 +1171,7 @@ def want_sheep(s: dict[str, Any]) -> int:
     if s["sheep"] < floor:
         return floor
     wool_d = int(s["demand"].get("WOOL", 0))
+    # No wool demand → don't expand (pasture/water steal).
     if wool_d <= 0:
         return s["sheep"]
     if s["n_quads"] == 1:
@@ -2316,7 +2320,8 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     if primary and primary != "STRAWBERRY":
         seed_gap = max(seed_gap, crop_gap(crop_plan(s), s, primary))
     reserve = min(900, seed_gap * SEED_COST.get(primary or "STRAWBERRY", 100))
-    if engine_of(s) == "MILK":
+    # Milk-led densify frees animal cash once seeds aren't the only printer.
+    if milk_sink(s) >= 1 and berry_sink(s) == 0:
         reserve = min(reserve, 200)
     if below_floor:
         reserve = min(reserve, 200)
