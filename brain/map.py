@@ -147,10 +147,10 @@ def softfloor_mode_active(
 ) -> bool:
     """Route softfloor schedule steals (herd ramp, speculative berry).
 
-    Densify EARLY_BERRY stays off. LAND_SPRINT/UNKNOWN/MILK_STACK need *deep*
-    hollow (empty≥20) — densify seed 55 reclassifies to LAND_SPRINT when ice
-    cream unlocks and was falsely routing at empty=16. LATE_BERRY only with
-    pizza (bakery-first densify excluded).
+    Densify EARLY_BERRY stays off. UNKNOWN uses fill hollow (empty≥16) so
+    softfloor post-land1 dawns keep routing after empty drops 25→17.
+    LAND_SPRINT/MILK_STACK keep deep hollow (empty≥20) — densify seed 55
+    crashed when LAND_SPRINT routed at empty≥16. LATE_BERRY needs pizza.
     """
     if int(params.get("softfloor_router_enabled", 1)) != 1:
         return False
@@ -175,7 +175,11 @@ def softfloor_mode_active(
             return False
         return empty >= fill
 
-    # LAND_SPRINT / UNKNOWN / MILK_STACK: deep hollow only.
+    if strategy == "UNKNOWN":
+        # Keep routing when empty dips 16→14 overnight (seed 33 plot3 miss).
+        return empty >= min(fill, int(params.get("plot3_hollow_empty_min", 14)))
+
+    # LAND_SPRINT / MILK_STACK: deep hollow only (densify-safe).
     return empty >= deep
 
 

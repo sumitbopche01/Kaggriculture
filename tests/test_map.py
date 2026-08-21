@@ -224,9 +224,14 @@ class SoftfloorRouterTests(unittest.TestCase):
         s = {"day": 8, "n_quads": 2, "empty": 25, "shops": ["PIZZA_SHOP", "BAKERY"]}
         self.assertTrue(softfloor_mode_active(s, "LATE_BERRY", PARAMS))
 
-    def test_unknown_hollow_routes(self):
-        s = {"day": 8, "n_quads": 2, "empty": 25}
+    def test_unknown_fill_hollow_routes(self):
+        """Softfloor UNKNOWN post-land1 often sits at empty 14–19 — must route."""
+        s = {"day": 8, "n_quads": 2, "empty": 17}
         self.assertTrue(softfloor_mode_active(s, "UNKNOWN", PARAMS))
+        s["empty"] = 14
+        self.assertTrue(softfloor_mode_active(s, "UNKNOWN", PARAMS))
+        s["empty"] = 13
+        self.assertFalse(softfloor_mode_active(s, "UNKNOWN", PARAMS))
 
     def test_milk_stack_needs_deep_hollow(self):
         shallow = {"day": 8, "n_quads": 2, "empty": 18}
