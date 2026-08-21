@@ -297,22 +297,18 @@ def cow_target(s: dict[str, Any], params: dict[str, int | float]) -> int:
         # to start the garnish; two+ scales toward the schedule cap.
         dual = shop_family_count(s.get("shops"), MILK_SHOPS & BERRY_SHOPS)
         milk_any = shop_family_count(s.get("shops"), MILK_SHOPS)
+        berry_any = shop_family_count(s.get("shops"), BERRY_SHOPS)
         n_quads = int(s.get("n_quads", 1))
-        if n_quads >= 2 and (dual >= 1 or milk_any >= 1):
+        if n_quads >= 2 and (dual >= 1 or milk_any >= 1 or berry_any >= 1):
             from brain.schedules import berry_cow_cap
 
             cap = berry_cow_cap(int(params.get("berry_milk_cow_cap", 6)))
             mouth_cap = int(params.get("mouth_cap_2qplus", 14))
             other = int(s.get("sheep") or 0) + int(s.get("geese") or 0)
             cap = min(cap, max(0, mouth_cap - other))
-            if dual >= 2:
-                extra = 2 * min(dual - 1, 3)
-            elif dual >= 1 or milk_any >= 1:
-                extra = int(params.get("berry_milk_cow_extra", 4))
-            else:
-                extra = 0
-            hard = int(params.get("berry_cow_hard_cap", 8))
-            return min(cap, hard, max(floor, floor + extra))
+            # Softfloor ice-cream / berry maps run ~8–10 cows by d10.
+            hard = int(params.get("berry_cow_hard_cap", 10))
+            return max(floor, min(cap, hard))
         return max(cows, floor)
     sink = milk_sink_n(s)
     if sink <= 0:

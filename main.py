@@ -18,7 +18,6 @@ from brain.board import (
     board_fill_land_empty_cap,
     board_fill_pressure,
     land_blocked_by_board_fill,
-    late_berry_target_met,
 )
 from brain.map import (
     MapStrategy,
@@ -46,6 +45,11 @@ from brain.playbook import (
 )
 from brain.dynamics import crew_live_cap, water_stress
 from brain.lookahead import rank_projects
+from brain.long_term import (
+    LongTermStreams,
+    best_animal_horizon_ev,
+    build_streams,
+)
 from brain.market import keep_qty as market_keep_qty
 from brain.market import market_inventory, sale_score
 from brain.turn_budget import (
@@ -54,10 +58,13 @@ from brain.turn_budget import (
     compute_turn_budget,
     cow_beats_seeds,
     cow_project_ev,
-    land_expansion_npv,
+    expand_vs_stay_advantage,
+    hire_project_ev,
+    hollow_expand_window,
+    land_fillable_tiles,
+    live_tiles_for_hollow_expand,
     post_land_seed_cap,
     seed_project_ev,
-    skip_days_after_land,
 )
 
 HARVEST_AGE = {"WHEAT": 4, "CARROT": 3, "MELON": 10}
@@ -88,7 +95,7 @@ ANIMAL_INTERVAL = {"GOOSE": 1, "COW": 2, "SHEEP": 3}
 ANIMAL_PRODUCT = {"GOOSE": "EGG", "COW": "MILK", "SHEEP": "WOOL"}
 SHED_TILES = ((4, 4), (5, 4), (4, 5), (5, 5))
 LAND_COST = (1000, 2000, 4000)
-MAX_HANDS = 12
+MAX_HANDS = 13  # softfloor median peak ~13; frontier spikes to 14 on land2 day
 HIRES_PER_TURN = 5
 MARKET_LIMIT = 10
 DROP_ITEMS = ("FERTILIZER", "WOOL", "MILK", "MELON")
@@ -155,16 +162,25 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "land_day_min": 5,
     "land_day_max": 22,
     "max_quads_for_land": 3,
+    "land3_day_min": 13,
+    "land3_day_max": 20,
+    "land3_money_min": 5500,
+    "land_horizon_day_max": 28,
     "land2_day_min": 9,
     "land2_day_max": 22,
-    "land2_money_min": 3500,
+    "land2_money_min": 2800,
     "land2_empty_max": 4,
     # Replay winners buy plot-3 near day 11 with ~10–12 berries, not 16.
     "land2_strawberry_min": 10,
     "land2_tomato_min": 12,
     "land2_schedule_cow_min": 6,
-    "land2_schedule_empty_max": 6,
-    "land2_dense_money_min": 2800,
+    # Softfloor bots buy plot-3 ~d10–12 with empty still ~40–60 (then fill).
+    "land2_schedule_empty_max": 55,
+    "land2_schedule_empty_min": 12,
+    "land2_schedule_plantable_min": 10,
+    "land2_schedule_berry_min": 16,
+    "land2_packed_empty_max": 6,
+    "land2_dense_money_min": 2500,
     "land2_dense_empty_max": 8,
     "berry_milk_cow_cap": 10,
     "berry_milk_cow_extra": 4,
@@ -211,7 +227,52 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "map_milk_defer_milk_sink_min": 2,
     "map_milk_defer_empty_max": 14,
     "map_milk_sprint_defer_empty_max": 12,
-    # Board-fill invariant (no land while board is sparse)
+    # Softfloor: hire-aware multi-dawn. Packed printers (empty ≤8) keep
+    # two-dawn residual so fat stands score ~0 (seed 89 densify path).
+    "land_hollow_soft_cap": 14,
+    "land_hollow_penalty_k": 4.0,
+    "land_stand_ready_min": 10,
+    "land2_tomato_soft_min": 8,
+    "land2_hollow_empty_max": 45,
+    "land_npv_realize": 0.7,
+    "land_expand_margin": 0.0,
+    "land2_packed_stand_min": 24,
+    "berry_cow_hard_cap": 10,
+    # Multi-stream long-term (crops + milk/egg/wool)
+    "lt_secondary_weight": 0.25,
+    "lt_animal_realize": 0.7,
+    "lt_land_animal_realize": 0.45,
+    "lt_land_animal_scale": 0.1,
+    "lt_animal_project_scale": 0.15,
+    "lt_pasture_frac": 0.28,
+    "lt_inventory_realize": 0.15,
+    # Herd-with-land expand-while-hollow (softfloor ~d10 plot-3)
+    "hollow_live_cap_factor": 1.25,
+    "hollow_live_empty_min": 20,
+    "hollow_land_day_max": 12,
+    "hollow_herd_push": 0,
+    "hollow_herd_deep_empty": 20,
+    "lt_hollow_berry_animal_scale": 0.12,
+    "hollow_seed_hold_factor": 0.35,
+    "hollow_seed_early_factor": 0.6,
+    "hollow_land_priority_boost": 1.0,
+    "hollow_land_npv_min": 5000,
+    "hollow_preserve_empty_pad": 2,
+    "hollow_preland_stand_cap": 20,
+    # Softfloor steal: labor-gated hollow plot-3; dawn burst off by default
+    # (burst alone crashes densify 7/42 — enable only with map classifier).
+    "land2_hollow_cow_min": 4,
+    "post_land2_cow_burst": 1,
+    "post_land2_cow_day_max": -1,
+    "hollow_plot3_fill_frac": 0.35,
+    # Post-plot-3 crew spike (frontier ~14 hires on land2 day)
+    "land2_hire_target": 13,
+    "land2_hire_burst": 6,
+    "land2_hire_empty_min": 16,
+    "land2_post_seed_keep": 200,
+    "nonberry_secondary_cap": 16,
+    "capital_followup": 1,
+    # Board-fill pressure (plant priority); land ban demoted to NPV hollow pen
     "board_fill_land_empty_max_1q": 10,
     "board_fill_land_empty_max_2q": 8,
     "board_fill_land_empty_max_3q": 6,
@@ -730,15 +791,304 @@ def land_bundle_cost(s: dict[str, Any]) -> int:
     return LAND_COST[s["n_quads"] - 1] + 800
 
 
+def _productive_days(s: dict[str, Any], *, for_land: bool = False) -> int:
+    """Horizon for NPV. Land uses replant cutoff; herd/seed may use late dump."""
+    day = int(s.get("day") or 0)
+    end = int(PARAMS.get("engine_replant_day_max", 27))
+    if not for_land:
+        end = max(end, int(PARAMS.get("land_horizon_day_max", 28)))
+    return max(0, end - day)
+
+
 def _turn_budget(s: dict[str, Any]) -> TurnBudget:
     tp = s.get("turn_plan")
     if tp is not None and tp.budget is not None:
         return tp.budget
     primary = _primary_cash(s)
     tile_ev = plan_ev(s, primary) if primary else 0.0
-    days = max(0, int(PARAMS["engine_replant_day_max"]) - int(s["day"]))
     return compute_turn_budget(
-        s, cash_crop=primary or "", tile_ev=tile_ev, productive_days=days
+        s, cash_crop=primary or "", tile_ev=tile_ev, productive_days=_productive_days(s)
+    )
+
+
+def _stand_factor(s: dict[str, Any]) -> float:
+    """0–1.5 readiness from live cash stand (soft; not a hard land veto)."""
+    berries = int(s["crops"].get("STRAWBERRY", 0) or 0)
+    tomatoes = int(s["crops"].get("TOMATO", 0) or 0)
+    melons = int(s["crops"].get("MELON", 0) or 0)
+    carrots = int(s["crops"].get("CARROT", 0) or 0)
+    stand = max(berries, tomatoes, melons, carrots)
+    ready = max(1, int(PARAMS.get("land_stand_ready_min", 6)))
+    return max(0.35, min(1.5, float(stand) / float(ready)))
+
+
+def _sheep_horizon_target(s: dict[str, Any]) -> int:
+    wool_d = int((s.get("demand") or {}).get("WOOL", 0) or 0)
+    if wool_d <= 0:
+        return int(s.get("sheep") or 0)
+    floor = int(PARAMS["sheep_floor"]) if int(s["day"]) <= int(PARAMS["sheep_floor_day_max"]) else 0
+    return min(
+        int(PARAMS["sheep_expand_cap"]),
+        max(floor, int(PARAMS.get("wool_herd_base", 2)) + wool_d),
+    )
+
+
+def _goose_horizon_target(s: dict[str, Any]) -> int:
+    sinks = egg_sink(s)
+    if sinks <= 0 or int(s["day"]) > 20:
+        return int(s.get("geese") or 0)
+    max_geese = 1 if int(s.get("n_quads") or 1) <= 2 else 2
+    egg_target = max_geese
+    if sinks >= 2 and px(s, "EGG") >= 65:
+        egg_target = min(max_geese, 1 + (sinks - 1) // 2)
+    return max(int(s.get("geese") or 0), egg_target)
+
+
+def _long_term_streams(s: dict[str, Any]) -> LongTermStreams:
+    """Crops + milk/egg/wool (+ light inventory) for horizon planning."""
+    cached = s.get("_lt_streams")
+    day = int(s.get("day") or 0)
+    hour = int(s.get("hour") or 0)
+    if cached is not None and cached[0] == day and cached[1] == hour:
+        return cached[2]
+    primary = _primary_cash(s)
+    days = _productive_days(s)
+    primary_ev = plan_ev(s, primary) if primary else 0.0
+    shed = s.get("shed") or {}
+    crops = s.get("crops") or {}
+    carrot_sinks = sum(
+        1 for sh in (s.get("shops") or []) if sh in ("PET_CAFE", "FARMERS_MARKET")
+    )
+    streams = build_streams(
+        productive_days=days,
+        primary_ev=primary_ev,
+        berry_ev=plan_ev(s, "STRAWBERRY"),
+        tomato_ev=plan_ev(s, "TOMATO"),
+        carrot_ev=plan_ev(s, "CARROT"),
+        melon_ev=plan_ev(s, "MELON"),
+        berry_sinks=berry_sink(s),
+        milk_sinks=milk_sink(s),
+        carrot_sinks=carrot_sinks,
+        egg_sinks=egg_sink(s),
+        wool_demand=int((s.get("demand") or {}).get("WOOL", 0) or 0),
+        milk_px=float(milk_px(s)),
+        egg_px=float(px(s, "EGG")),
+        wool_px=float(wool_px(s)),
+        cows=int(s.get("cows") or 0),
+        sheep=int(s.get("sheep") or 0),
+        geese=int(s.get("geese") or 0),
+        cow_target=max(int(s.get("cows") or 0), int(cow_target(s, PARAMS))),
+        sheep_target=_sheep_horizon_target(s),
+        goose_target=_goose_horizon_target(s),
+        cow_interval=int(ANIMAL_INTERVAL["COW"]),
+        sheep_interval=int(ANIMAL_INTERVAL["SHEEP"]),
+        goose_interval=int(ANIMAL_INTERVAL["GOOSE"]),
+        cow_cost=int(ANIMAL_COST["COW"]),
+        sheep_cost=int(ANIMAL_COST["SHEEP"]),
+        goose_cost=int(ANIMAL_COST["GOOSE"]),
+        shed_berries=int(shed.get("STRAWBERRY", 0) or 0),
+        shed_milk=int(shed.get("MILK", 0) or 0),
+        shed_eggs=int(shed.get("EGG", 0) or 0),
+        shed_wool=int(shed.get("WOOL", 0) or 0),
+        shed_melons=int(shed.get("MELON", 0) or 0),
+        berry_px=float(px(s, "STRAWBERRY")),
+        melon_px=float(px(s, "MELON")),
+        secondary_weight=float(PARAMS.get("lt_secondary_weight", 0.25)),
+        animal_realize=float(PARAMS.get("lt_animal_realize", 0.7)),
+        land_animal_realize=float(PARAMS.get("lt_land_animal_realize", 0.45)),
+        pasture_frac=float(PARAMS.get("lt_pasture_frac", 0.28)),
+        inventory_realize=float(PARAMS.get("lt_inventory_realize", 0.15)),
+    )
+    s["_lt_streams"] = (day, hour, streams)
+    return streams
+
+
+def _hollow_expand_window(s: dict[str, Any]) -> bool:
+    """True in softfloor plot-3 window: 2q, mid-hollow, milk/berry path, land2 days."""
+    if not hollow_expand_window(
+        n_quads=int(s.get("n_quads") or 0),
+        empty=int(s.get("empty") or 0),
+        soft_cap=int(PARAMS.get("land_hollow_soft_cap", 14)),
+        hollow_max=int(PARAMS.get("land2_hollow_empty_max", 45)),
+    ):
+        return False
+    day = int(s.get("day") or 0)
+    if day < int(PARAMS["land2_day_min"]) - 1:
+        return False
+    if day > int(PARAMS.get("land2_day_max", 22)):
+        return False
+    if milk_sink(s) >= 1:
+        return True
+    # Berry softfloor: deep hollow only (empty >= deep). Densify printers
+    # drop below deep empty quickly; softfloor stays hollow through ~d10.
+    if berry_sink(s) >= 1:
+        if egg_sink(s) >= 1:
+            return False
+        return int(s.get("empty") or 0) >= int(
+            PARAMS.get("hollow_herd_deep_empty", 20)
+        )
+    return False
+
+
+def _post_land2_herd_burst(s: dict[str, Any]) -> bool:
+    """Dawn multi-cow while deep-hollow after land2 — softfloor ~8 cows by d10.
+
+    Also requires crew cannot fill empties soon — densify printers that briefly
+    look hollow still have high day_plantable and must not burst.
+    """
+    if int(s.get("hour") or 0) != 0:
+        return False
+    if int(s.get("n_quads") or 0) < 2:
+        return False
+    if berry_sink(s) < 1:
+        return False
+    empty = int(s.get("empty") or 0)
+    if empty < int(PARAMS.get("hollow_herd_deep_empty", 20)):
+        return False
+    if int(s.get("cows") or 0) >= int(PARAMS.get("land2_schedule_cow_min", 6)):
+        return False
+    if int(s.get("day") or 0) > int(PARAMS.get("post_land2_cow_day_max", 10)):
+        return False
+    if int(s.get("crops", {}).get("STRAWBERRY", 0) or 0) < 12 and int(
+        s.get("crops", {}).get("MELON", 0) or 0
+    ) < 6:
+        return False
+    bud = _turn_budget(s)
+    frac = float(PARAMS.get("hollow_plot3_fill_frac", 0.45))
+    return bud.day_plantable < empty * frac
+
+
+def _hollow_plot3_labor_ok(s: dict[str, Any]) -> bool:
+    """True when remaining empties exceed near-term plant capacity (softfloor)."""
+    empty = int(s.get("empty") or 0)
+    if empty <= int(PARAMS.get("land2_empty_max", 4)):
+        return True
+    bud = _turn_budget(s)
+    frac = float(PARAMS.get("hollow_plot3_fill_frac", 0.45))
+    return bud.day_plantable < empty * frac
+
+
+def _land_cow_min(s: dict[str, Any]) -> int:
+    """Softer cow gate only on true softfloor hollow (labor cannot fill)."""
+    cow_min = int(PARAMS.get("land2_schedule_cow_min", 6))
+    deep = int(PARAMS.get("hollow_herd_deep_empty", 20))
+    hi = int(PARAMS.get("land2_hollow_empty_max", 45))
+    empty = int(s.get("empty") or 0)
+    if (
+        int(s.get("n_quads") or 0) == 2
+        and deep <= empty <= hi
+        and int(s.get("day") or 0) <= int(PARAMS.get("hollow_land_day_max", 12))
+        and _hollow_plot3_labor_ok(s)
+    ):
+        return int(PARAMS.get("land2_hollow_cow_min", 4))
+    return cow_min
+
+
+def _herd_ready_for_land(s: dict[str, Any]) -> bool:
+    return int(s.get("cows") or 0) >= int(PARAMS.get("land2_schedule_cow_min", 6))
+
+
+def _hold_densify_for_expand(s: dict[str, Any]) -> bool:
+    """Hold densify while finishing herd, or when land NPV is strongly positive."""
+    if not _hollow_expand_window(s):
+        return False
+    day = int(s.get("day") or 0)
+    if day > int(PARAMS.get("hollow_land_day_max", 14)):
+        return False
+    cow_min = int(PARAMS.get("land2_schedule_cow_min", 6))
+    cows = int(s.get("cows") or 0)
+    # Softfloor path: reserve cash for the last cow(s) before plot-3.
+    if cows >= max(0, cow_min - 1) and cows < cow_min:
+        return True
+    if cows < cow_min:
+        return False
+    cost = LAND_COST[min(int(s.get("n_quads") or 1) - 1, 2)]
+    return _expansion_npv_score(s, land_cost=cost) >= float(
+        PARAMS.get("hollow_land_npv_min", 5000)
+    )
+
+
+def _apply_hollow_capital_bias(
+    s: dict[str, Any],
+    *,
+    land_npv: float,
+    cow_ev: float,
+    seed_ev: float,
+    defer_animals: bool,
+) -> tuple[float, float, float]:
+    """Herd-with-land: cows first, then land only when NPV clears a hard floor."""
+    if defer_animals or not _hollow_expand_window(s):
+        return land_npv, cow_ev, seed_ev
+    cow_min = int(PARAMS.get("land2_schedule_cow_min", 6))
+    boost = float(PARAMS.get("hollow_land_priority_boost", 1.0))
+    cows = int(s.get("cows") or 0)
+    if cows < cow_min and cow_ev > 0:
+        cow_ev = max(cow_ev, seed_ev + boost)
+    elif (
+        cows >= cow_min
+        and land_npv >= float(PARAMS.get("hollow_land_npv_min", 5000))
+    ):
+        land_npv = max(land_npv, seed_ev + boost, cow_ev + 0.5)
+    return land_npv, cow_ev, seed_ev
+
+
+def _seed_allowed_during_hollow(s: dict[str, Any], *, land_npv: float, cow_ev: float, afford: int) -> bool:
+    """False when cash should stay reserved for cows or plot-3."""
+    if not _hold_densify_for_expand(s):
+        return True
+    if cow_ev > 0 and afford >= ANIMAL_COST["COW"] and not _herd_ready_for_land(s):
+        return False
+    if land_npv > 0 and _herd_ready_for_land(s) and _will_buy_land(s, afford):
+        return False
+    return True
+
+
+def _expansion_npv_score(s: dict[str, Any], *, land_cost: int) -> float:
+    """Expand vs stay — crop fill EV + gated milk/egg/wool land unlock."""
+    primary = _primary_cash(s)
+    budget = _turn_budget(s)
+    streams = _long_term_streams(s)
+    seed_c = int(SEED_COST.get(primary or "WHEAT", 10))
+    primary_ev = plan_ev(s, primary) if primary else 0.0
+    # When the primary printer is weak/missing, lean on blended crop streams
+    # (carrot/tomato/melon towns). Berry printers keep primary EV.
+    w = float(PARAMS.get("lt_secondary_weight", 0.25))
+    if primary_ev <= 0:
+        tile_ev = streams.fill_tile_ev
+    elif primary in ("CARROT", "TOMATO") or berry_sink(s) == 0:
+        tile_ev = (1.0 - w) * primary_ev + w * streams.fill_tile_ev
+    else:
+        tile_ev = primary_ev
+    empty = int(s.get("empty") or 0)
+    soft = int(PARAMS.get("land_hollow_soft_cap", 14))
+    # Honest spare-labor NPV only — no animal unlock boost on berry hollow
+    # (that pushed losing plot-3 on seeds 7/99/123).
+    animal = 0.0
+    if (
+        empty > soft
+        and primary != "STRAWBERRY"
+        and (
+            milk_sink(s) > 0
+            or egg_sink(s) > 0
+            or int((s.get("demand") or {}).get("WOOL", 0) or 0) > 0
+        )
+    ):
+        animal = streams.land_animal_unlock_ev * float(
+            PARAMS.get("lt_land_animal_scale", 0.1)
+        )
+    return expand_vs_stay_advantage(
+        workers=budget.workers,
+        hungry=budget.hungry,
+        live_tiles=budget.live_tiles,
+        productive_days=_productive_days(s, for_land=True),
+        tile_ev=tile_ev,
+        land_cost=land_cost,
+        seed_cost=seed_c,
+        empty=empty,
+        stand_factor=_stand_factor(s),
+        realize=float(PARAMS.get("land_npv_realize", 0.7)),
+        margin=float(PARAMS.get("land_expand_margin", 0.0)),
+        animal_unlock_ev=animal,
     )
 
 
@@ -780,33 +1130,26 @@ def _will_buy_land(s: dict[str, Any], afford: int) -> bool:
         best_ev = max((plan_ev(s, c) for c in s["scores"]), default=0.0)
         if best_ev * 25 * max(3, days_left(s["day"]) // 2) < cost:
             return False
-    # Plot 3+: NPV of dawn-capacity tiles after watering the live field.
-    # Evening packed boards have hour-plantable≈crew but day_plantable≈0.
+    # Plot 3+: multi-dawn expansion NPV (fat stands no longer zero day_plantable).
     if s["n_quads"] >= 2:
         primary = _primary_cash(s)
         budget = _turn_budget(s)
-        plantable_new = min(25, budget.day_plantable)
         seed_c = int(SEED_COST.get(primary or "WHEAT", 10))
-        skip = skip_days_after_land(
-            live_tiles=budget.live_tiles,
-            extra_empty=25,
-            workers=budget.workers,
-        )
-        npv = land_expansion_npv(
-            plantable_new=plantable_new,
-            tile_ev=budget.tile_ev,
-            productive_days=budget.productive_days,
-            land_cost=cost,
-            seed_cost=seed_c,
-            live_tiles=budget.live_tiles,
-            skip_days=skip,
-        )
-        if npv <= 0 or plantable_new <= 0:
+        npv = _expansion_npv_score(s, land_cost=cost)
+        if npv <= 0:
             return False
-        fill_cost = plantable_new * seed_c
-        # Keep enough cash to hire/feed the live field tomorrow — not a
-        # full day of tile EV (that blocked healthy expansions).
+        fill_n = land_fillable_tiles(
+            workers=budget.workers,
+            hungry=budget.hungry,
+            live_tiles=budget.live_tiles,
+            productive_days=budget.productive_days,
+            new_empty=25,
+            short_horizon=False,
+        )
+        # Seed a realistic first wave, not fantasy 25×seed in one market hour.
+        fill_cost = min(fill_n, max(8, budget.workers)) * seed_c
         live_ops = max(int(post_land_floor), int(budget.live_tiles) * 10)
+        live_ops = min(live_ops, int(post_land_floor) * 2)
         if afford < cost + fill_cost + live_ops:
             return False
     return True
@@ -1131,9 +1474,27 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
     ):
         take("MELON", min(int(PARAMS["melon_cap"]), leftover))
 
-    # Feed leftover, never a second cash crop. Berry maps leave the hole
-    # empty rather than flooding wheat over strawberries; only top up
-    # wheat when the planted+seeded feed floor is still short of plan.
+    # Non-berry engines: leftover becomes tomato/carrot cash, not only wheat.
+    # Berry maps still refuse a second cash crop (FM carrot steal).
+    if leftover > 0 and berry_sink(s) == 0:
+        sec_cap = int(PARAMS.get("nonberry_secondary_cap", 20))
+        for crop in ("TOMATO", "CARROT"):
+            if leftover <= 0:
+                break
+            if crop == primary:
+                continue
+            if int(demand.get(crop, 0) or 0) < 1:
+                continue
+            if not (plan_viable(s, crop) or _hold_engine_crop(s, crop)):
+                continue
+            have = int(plan.get(crop, 0) or 0)
+            room_c = max(0, sec_cap - have)
+            if room_c <= 0:
+                continue
+            take(crop, room_c)
+
+    # Feed leftover. Berry maps leave the hole empty rather than flooding
+    # wheat over strawberries; only top up wheat when feed floor is short.
     if leftover > 0 and (
         milk_led or int(demand.get("STRAWBERRY", 0) or 0) == 0
     ):
@@ -1205,6 +1566,7 @@ def want_cows(s: dict[str, Any]) -> int:
     if not milk_led:
         # Melon→cow bridge before berry EV clears. Softfloor/meta elites stock
         # ~8–10 cows by d10 on berry opens (not only ice/smoothie dual shops).
+        # Keep bridging after melons clear so harvest does not stall the herd.
         melons = int(s["crops"].get("MELON", 0) or 0)
         berry_open = berry_sink(s) >= 1
         dual = sum(
@@ -1217,11 +1579,15 @@ def want_cows(s: dict[str, Any]) -> int:
             bridge_cap = max(
                 bridge_cap, int(PARAMS.get("berry_melon_bridge_cow_cap", 8))
             )
+        melon_min = int(PARAMS.get("melon_bridge_melon_min", 6))
+        bridge_fuel = melons >= melon_min or (
+            berry_open and int(s["cows"]) >= int(PARAMS.get("cow_floor", 2))
+        )
         if (
             int(s["day"]) <= int(PARAMS.get("melon_bridge_cow_day_max", 12))
             and s["n_quads"] >= 2
             and (dual >= 1 or berry_open)
-            and melons >= int(PARAMS.get("melon_bridge_melon_min", 6))
+            and bridge_fuel
             and herd_can_expand(s)
             and s["cows"] < bridge_cap
         ):
@@ -1230,7 +1596,15 @@ def want_cows(s: dict[str, Any]) -> int:
             primary = _primary_cash(s)
             budget = _turn_budget(s)
             seed_c = int(SEED_COST.get(primary or "STRAWBERRY", 100))
-            if cow_beats_seeds(
+            # Schedule herd: keep ramping toward target without losing every
+            # buy to strawberry seed EV (opp ran 10 cows on 1286627911).
+            schedule_herd = (
+                berry_open
+                and int(s["day"]) <= 16
+                and int(s["cows"])
+                < min(target, int(PARAMS.get("berry_melon_bridge_cow_cap", 8)))
+            )
+            if schedule_herd or cow_beats_seeds(
                 cow_ev=animal_score("COW", milk_px(s), s["day"]),
                 tile_ev=budget.tile_ev,
                 cow_cost=int(ANIMAL_COST["COW"]),
@@ -1313,7 +1687,41 @@ def want_geese(s: dict[str, Any]) -> int:
     return min(s["geese"] + 1, max_geese)
 
 
+def _softfloor_calendar_land_ready(s: dict[str, Any]) -> bool:
+    """Elite plot-3 calendar: buy while hollow once herd+stand exist.
+
+    Softfloor winners (structured/frontier/top10): land2 on day 10–11 with
+    empty still high. Our board-fill ban blocks that path (seed 33: cows=6,
+    empty=20, melons=11, need_land=False). Require deep hollow + full softfloor
+    herd so densify printers (brief empty>14) do not sneak through.
+    """
+    if int(s.get("n_quads") or 0) != 2:
+        return False
+    day = int(s.get("day") or 0)
+    if day < int(PARAMS["land2_day_min"]):
+        return False
+    if day > int(PARAMS.get("hollow_land_day_max", 12)):
+        return False
+    empty = int(s.get("empty") or 0)
+    if empty < int(PARAMS.get("hollow_herd_deep_empty", 20)):
+        return False
+    if empty > int(PARAMS.get("land2_hollow_empty_max", 45)):
+        return False
+    # Softfloor median peak cows ≈ 8; require schedule cow_min to avoid
+    # densify melons+4-cow false positives.
+    if int(s.get("cows") or 0) < int(PARAMS.get("land2_schedule_cow_min", 6)):
+        return False
+    crops = s.get("crops") or {}
+    berries = int(crops.get("STRAWBERRY", 0) or 0)
+    melons = int(crops.get("MELON", 0) or 0)
+    tomatoes = int(crops.get("TOMATO", 0) or 0)
+    return berries >= 10 or melons >= 6 or tomatoes >= int(
+        PARAMS.get("land2_tomato_min", 12)
+    )
+
+
 def need_land(s: dict[str, Any]) -> bool:
+    """Safety + readiness gates; expansion NPV decides affordability/score."""
     ramp = in_late_ramp(s)
     if (
         s["day"] < PARAMS["land_day_min"]
@@ -1335,6 +1743,8 @@ def need_land(s: dict[str, Any]) -> bool:
         lshop = tp.flags.late_shop_sprint
         bok = tp.flags.berry_ok
         gap = tp.berry_gap
+    # Softfloor hollow expand: elites buy plot-3 while empty — bypass densify
+    # board-fill ban when calendar herd+stand are ready.
     if land_blocked_by_board_fill(
         s,
         PARAMS,
@@ -1343,7 +1753,7 @@ def need_land(s: dict[str, Any]) -> bool:
         late_shop_sprint=lshop,
         berry_ramp=ramp_active,
         strategy=strat,
-    ):
+    ) and not _softfloor_calendar_land_ready(s):
         return False
     relax = land_ramp_relax(s)
     if s["n_quads"] == 1 and s["empty"] > strategy_quad1_empty_cap(
@@ -1367,15 +1777,12 @@ def need_land(s: dict[str, Any]) -> bool:
             return True
         return False
     if s["n_quads"] == 2:
-        # Softfloor $100k+ bots buy plot-3 ~d10 even on pizza/pet opens.
-        # Tomato-meta elites often stay 2q — require a dense stand either way.
-        strat = map_strategy(s)
+        # Readiness only — expand vs stay NPV decides whether land beats densify.
+        # Keep HEAD empty_max discipline; herd+stand unlocks softfloor hollow.
         berries = int(s["crops"].get("STRAWBERRY", 0) or 0)
         melons = int(s["crops"].get("MELON", 0) or 0)
         tomatoes = int(s["crops"].get("TOMATO", 0) or 0)
         milk_only = (milk_sink(s) >= 1 and berry_sink(s) == 0) or strat == "MILK_STACK"
-        # LAND_SPRINT is mainly a 1→2 densify cue. Plot-3 only when the
-        # berry stand is already fat (seed 21 bought hollow plot-3 at ~6 berries).
         if strat == "LAND_SPRINT" and berries < int(
             PARAMS.get("land2_sprint_strawberry_min", 24)
         ):
@@ -1388,23 +1795,45 @@ def need_land(s: dict[str, Any]) -> bool:
         if int(s["day"]) > int(PARAMS.get("land2_day_max", 22)):
             return False
         money_min = int(PARAMS["land2_money_min"])
-        # Fat berry stands unlock plot-3 once cash exists; softfloor buys ~d10.
-        cow_min = int(PARAMS.get("land2_schedule_cow_min", 6))
-        if berries >= 16 and int(s["cows"]) >= cow_min:
-            money_min = min(money_min, int(PARAMS.get("land2_dense_money_min", 2800)))
+        cow_min = _land_cow_min(s)
+        full_cow_min = int(PARAMS.get("land2_schedule_cow_min", 6))
+        calendar = _softfloor_calendar_land_ready(s)
+        if calendar:
+            cow_min = min(cow_min, int(PARAMS.get("land2_hollow_cow_min", 4)))
+            money_min = min(money_min, int(PARAMS.get("land2_dense_money_min", 2500)))
+        if berries >= 16 and int(s["cows"]) >= full_cow_min:
+            money_min = min(money_min, int(PARAMS.get("land2_dense_money_min", 2500)))
+        if (
+            milk_sink(s) >= 1
+            and int(s["cows"]) >= full_cow_min
+            and int(PARAMS.get("land_hollow_soft_cap", 14))
+            < int(s["empty"])
+            <= int(PARAMS.get("land2_hollow_empty_max", 45))
+        ):
+            money_min = min(money_min, int(PARAMS.get("land2_dense_money_min", 2500)))
+        if (
+            int(s["cows"]) >= cow_min
+            and cow_min < full_cow_min
+            and _hollow_plot3_labor_ok(s)
+        ):
+            money_min = min(money_min, int(PARAMS.get("land2_dense_money_min", 2500)))
         if int(s["money"]) < money_min:
             return False
         empty_max = int(PARAMS["land2_empty_max"])
         stand_ok = berries >= 12 or melons >= 6 or (
             milk_only and tomatoes >= int(PARAMS.get("land2_tomato_min", 12))
         )
-        if int(s["cows"]) >= cow_min and stand_ok:
-            empty_max = max(empty_max, int(PARAMS.get("land2_schedule_empty_max", 6)))
-        if berries >= 16 and int(s["cows"]) >= cow_min:
+        # Calendar softfloor OR spare-labor gate unlocks hollow empty_max.
+        if int(s["cows"]) >= cow_min and stand_ok and (
+            calendar or _hollow_plot3_labor_ok(s)
+        ):
+            empty_max = max(
+                empty_max, int(PARAMS.get("land2_schedule_empty_max", 55))
+            )
+        if berries >= 16 and int(s["cows"]) >= full_cow_min:
             empty_max = max(empty_max, int(PARAMS.get("land2_dense_empty_max", 8)))
         if s["empty"] > empty_max:
             return False
-        # Softfloor / kay buy plot-3 with a real herd, not a 2–3 cow floor.
         if int(s["cows"]) < cow_min:
             return False
         if milk_only and not stand_ok:
@@ -1415,7 +1844,24 @@ def need_land(s: dict[str, Any]) -> bool:
                 return False
         elif not milk_only and berry_sink(s) == 0 and milk_sink(s) == 0:
             return False
-        return stand_ok or (berry_sink(s) > 0 and berries >= int(PARAMS["land2_strawberry_min"]))
+        return stand_ok or (
+            berry_sink(s) > 0 and berries >= int(PARAMS["land2_strawberry_min"])
+        )
+    if s["n_quads"] == 3:
+        # Plot 4 — softfloor/elite tails; NPV still decides after readiness.
+        if int(s["day"]) < int(PARAMS.get("land3_day_min", 13)):
+            return False
+        if int(s["day"]) > int(PARAMS.get("land3_day_max", 20)):
+            return False
+        if int(s["money"]) < int(PARAMS.get("land3_money_min", 4500)):
+            return False
+        if int(s["cows"]) < int(PARAMS.get("land2_schedule_cow_min", 6)):
+            return False
+        if berry_sink(s) == 0 and milk_sink(s) == 0 and egg_sink(s) == 0:
+            return False
+        berries = int(s["crops"].get("STRAWBERRY", 0) or 0)
+        tomatoes = int(s["crops"].get("TOMATO", 0) or 0)
+        return max(berries, tomatoes) >= int(PARAMS.get("land_stand_ready_min", 10))
     return False
 
 
@@ -1504,13 +1950,33 @@ def plan_turn(s: dict[str, Any]) -> TurnPlan:
     tp.cash_crop = primary or ""
     tp.cash_gap = cash_gap_n
     tile_ev = plan_ev(s, primary) if primary else 0.0
-    prod_days = max(0, int(PARAMS["engine_replant_day_max"]) - int(s["day"]))
+    prod_days = _productive_days(s)
     tp.budget = compute_turn_budget(
         s, cash_crop=tp.cash_crop, tile_ev=tile_ev, productive_days=prod_days
     )
+    # Multi-stream snapshot for land/animal decisions this hour.
+    s["lt_streams"] = _long_term_streams(s)
     s["turn_plan"] = tp
     s["regime"] = tp.regime
     return tp
+
+
+def _land2_crew_spike(s: dict[str, Any]) -> bool:
+    """Frontier-style hire spike after plot-3: fill the new 25 empties.
+
+    Softfloor winners jump to ~12–14 hands on land2 day; we were buying
+    plot-3 then sitting on empty@d16≈29 (seed 33). Only fire post-buy —
+    pre-buy spikes spent cash and blocked land.
+    """
+    day = int(s.get("day") or 0)
+    empty = int(s.get("empty") or 0)
+    n_quads = int(s.get("n_quads") or 0)
+    empty_min = int(PARAMS.get("land2_hire_empty_min", 16))
+    if n_quads < 3 or empty < empty_min:
+        return False
+    if day <= int(PARAMS.get("hollow_land_day_max", 12)) + 3:
+        return True
+    return int(_LAND_SPRINT.get("until_day", -1)) >= day
 
 
 def want_hands(s: dict[str, Any]) -> int:
@@ -1538,6 +2004,8 @@ def want_hands(s: dict[str, Any]) -> int:
         from brain.schedules import hire_target_day
 
         need = max(need, hire_target_day(int(s["day"]), default=base))
+    if _land2_crew_spike(s):
+        need = max(need, int(PARAMS.get("land2_hire_target", 13)))
     return min(MAX_HANDS, max(base, need))
 
 
@@ -1546,6 +2014,8 @@ def hire_burst_cap(s: dict[str, Any]) -> int:
     hour = int(s.get("hour") or 0)
     if hour > 2:
         return HIRES_PER_TURN
+    if _land2_crew_spike(s):
+        return min(MAX_HANDS, int(PARAMS.get("land2_hire_burst", 9)))
     if hire_water_pressure(s):
         return min(MAX_HANDS, 9)
     return HIRES_PER_TURN
@@ -1556,7 +2026,10 @@ def _hire_budget(s: dict[str, Any], market: list, *, reserve_land: bool) -> int:
     reserved = 0
     hour = int(s.get("hour") or 0)
     # Dawn crew first when true water pressure — skip densify/land reserves.
-    crew_first = hour <= 2 and hire_water_pressure(s)
+    # Softfloor land2: same — fill crew before seed stockpile eats the 10-cap.
+    crew_first = hour <= 2 and (
+        hire_water_pressure(s) or _land2_crew_spike(s)
+    )
     if not crew_first:
         if reserve_land:
             reserved += 1
@@ -2471,6 +2944,8 @@ def _buy_planned_seeds(
 
         if rescue:
             keep = int(keep * 0.6)
+        if after_land and _land2_crew_spike(s):
+            keep = min(keep, int(PARAMS.get("land2_post_seed_keep", 200)))
         keep = max(0, min(afford - 1, keep))
 
         if not berry_only and crop != "STRAWBERRY" and crop != primary and len(market) >= MARKET_LIMIT:
@@ -2497,25 +2972,67 @@ def _land_project_npv(s: dict[str, Any], afford: int) -> float:
         return 0.0
     if not _will_buy_land(s, afford):
         return 0.0
+    if s["n_quads"] == 1:
+        # 1→2 survival unlock — keep a positive score when gates say buy.
+        return 1.0
     cost = LAND_COST[s["n_quads"] - 1]
-    primary = _primary_cash(s)
+    return _expansion_npv_score(s, land_cost=cost)
+
+
+def _hire_project_score(s: dict[str, Any], afford: int) -> float:
+    """Hire only when it lifts expand-vs-stay advantage (crew-gated expand)."""
+    if int(s.get("n_quads") or 0) < 2 or not need_land(s):
+        return 0.0
+    empty = int(s.get("empty") or 0)
+    soft_cap = int(PARAMS.get("land_hollow_soft_cap", 14))
+    hollow_max = int(PARAMS.get("land2_hollow_empty_max", 45))
+    # Crew-gated expansion on softfloor hollow boards (not packed printers).
+    if not (soft_cap < empty <= hollow_max):
+        return 0.0
+    cost = fib_hire_cost(int(s.get("hires_today") or 0))
+    if afford < cost + 40:
+        return 0.0
     budget = _turn_budget(s)
-    plantable_new = min(25, budget.day_plantable)
+    streams = _long_term_streams(s)
+    primary = _primary_cash(s)
+    land_cost = LAND_COST[s["n_quads"] - 1]
     seed_c = int(SEED_COST.get(primary or "WHEAT", 10))
-    skip = skip_days_after_land(
-        live_tiles=budget.live_tiles,
-        extra_empty=25,
+    primary_ev = plan_ev(s, primary) if primary else budget.tile_ev
+    animal = 0.0
+    if _primary_cash(s) != "STRAWBERRY":
+        animal = streams.land_animal_unlock_ev * float(
+            PARAMS.get("lt_land_animal_scale", 0.1)
+        )
+    common = dict(
         workers=budget.workers,
-    )
-    return land_expansion_npv(
-        plantable_new=plantable_new,
-        tile_ev=budget.tile_ev,
-        productive_days=budget.productive_days,
-        land_cost=cost,
-        seed_cost=seed_c,
+        hungry=budget.hungry,
         live_tiles=budget.live_tiles,
-        skip_days=skip,
+        productive_days=budget.productive_days,
+        tile_ev=primary_ev,
+        land_cost=land_cost,
+        seed_cost=seed_c,
+        empty=empty,
+        stand_factor=_stand_factor(s),
+        realize=float(PARAMS.get("land_npv_realize", 0.7)),
+        margin=float(PARAMS.get("land_expand_margin", 0.0)),
+        animal_unlock_ev=animal,
     )
+    npv0 = expand_vs_stay_advantage(**common)
+    npv1 = expand_vs_stay_advantage(**common, hire_n=1, hire_cost_total=cost)
+    lift = npv1 - npv0
+    if lift <= 0:
+        return 0.0
+    base = hire_project_ev(
+        tile_ev=primary_ev,
+        productive_days=budget.productive_days,
+        hire_cost=cost,
+        empty=empty,
+        workers=budget.workers,
+        hungry=budget.hungry,
+        unwatered=budget.unwatered,
+        live_tiles=budget.live_tiles,
+    )
+    return max(base, lift)
 
 
 def _seed_project_score(s: dict[str, Any]) -> tuple[float, int]:
@@ -2539,20 +3056,42 @@ def _seed_project_score(s: dict[str, Any]) -> tuple[float, int]:
         n_seeds=n,
         seed_cost=int(SEED_COST.get(primary, 100)),
     )
+    if _hollow_expand_window(s):
+        if _hold_densify_for_expand(s):
+            ev *= float(PARAMS.get("hollow_seed_hold_factor", 0.3))
+        elif not _herd_ready_for_land(s):
+            ev *= float(PARAMS.get("hollow_seed_early_factor", 0.55))
     return ev, n
 
 
 def _cow_project_score(s: dict[str, Any]) -> float:
-    if want_cows(s) <= s["cows"]:
-        return 0.0
+    """Milk floor + light wool/egg horizon when those sinks dominate."""
     budget = _turn_budget(s)
-    # animal_score is coins/day; scale to the same horizon as seed/land NPV.
-    per_day = cow_project_ev(
-        cow_ev=animal_score("COW", milk_px(s), s["day"]),
+    legacy = 0.0
+    if want_cows(s) > int(s.get("cows") or 0):
+        per_day = cow_project_ev(
+            cow_ev=animal_score("COW", milk_px(s), s["day"]),
+            cow_cost=int(ANIMAL_COST["COW"]),
+        )
+        legacy = per_day * max(1, int(budget.productive_days))
+    streams = _long_term_streams(s)
+    scale = float(PARAMS.get("lt_animal_project_scale", 0.35))
+    # Only boost non-milk animals when berry is not the printer.
+    if berry_sink(s) > 0 and _primary_cash(s) == "STRAWBERRY":
+        return legacy
+    multi = scale * best_animal_horizon_ev(
+        productive_days=budget.productive_days,
+        milk_day=streams.milk_day,
+        wool_day=streams.wool_day,
+        egg_day=streams.egg_day,
+        want_cow=want_cows(s) > int(s.get("cows") or 0),
+        want_sheep=want_sheep(s) > int(s.get("sheep") or 0),
+        want_goose=want_geese(s) > int(s.get("geese") or 0),
         cow_cost=int(ANIMAL_COST["COW"]),
+        sheep_cost=int(ANIMAL_COST["SHEEP"]),
+        goose_cost=int(ANIMAL_COST["GOOSE"]),
     )
-    return per_day * max(1, int(budget.productive_days))
-
+    return max(legacy, multi)
 
 def _lookahead_project_scores(
     s: dict[str, Any],
@@ -2584,6 +3123,108 @@ def _lookahead_project_scores(
         return None
 
 
+def _capital_followup(
+    market: list,
+    afford: int,
+    s: dict[str, Any],
+    pick: str,
+    *,
+    defer_animals: bool,
+) -> int:
+    """Second capital action same hour — herd-with-land / land-then-herd."""
+    if int(PARAMS.get("capital_followup", 1)) != 1:
+        return afford
+    if pick == "land" and not defer_animals and afford >= ANIMAL_COST["COW"]:
+        if (
+            want_cows(s) > int(s.get("cows") or 0)
+            or want_sheep(s) > int(s.get("sheep") or 0)
+            or want_geese(s) > int(s.get("geese") or 0)
+        ):
+            afford = _buy_animals(market, afford, s)
+    elif pick == "cow" and need_land(s):
+        cost = LAND_COST[min(int(s.get("n_quads") or 1) - 1, 2)]
+        if _expansion_npv_score(s, land_cost=cost) >= float(
+            PARAMS.get("hollow_land_npv_min", 5000)
+        ) and _will_buy_land(s, afford):
+            before = int(s.get("n_quads") or 0)
+            afford = _maybe_buy_land(market, afford, s)
+            if int(s.get("n_quads") or 0) > before:
+                afford = _buy_planned_seeds(
+                    market, afford, s, s["seeds"], berry_only=False, after_land=True
+                )
+    # Softfloor: second cow same dawn while still hollow after land2.
+    if (
+        pick == "cow"
+        and not defer_animals
+        and _post_land2_herd_burst(s)
+        and want_cows(s) > int(s.get("cows") or 0)
+        and afford >= ANIMAL_COST["COW"]
+    ):
+        afford = _buy_animals(market, afford, s)
+    return afford
+
+
+def _post_land_crew_fill(market: list, afford: int, s: dict[str, Any]) -> int:
+    """Reserved: same-hour hire after land burned cash on seed 33.
+
+    Crew spike is applied on following dawns via want_hands / hire_burst_cap
+    while land-sprint empties remain. Land hour prioritizes seeds only.
+    """
+    return afford
+
+
+def _execute_capital_pick(
+    market: list,
+    afford: int,
+    s: dict[str, Any],
+    pick: str,
+    *,
+    defer_animals: bool,
+    berry_only_seeds: bool = False,
+) -> int:
+    if pick == "land":
+        before = int(s.get("n_quads") or 0)
+        afford = _maybe_buy_land(market, afford, s)
+        if int(s.get("n_quads") or 0) > before:
+            afford = _buy_planned_seeds(
+                market,
+                afford,
+                s,
+                s["seeds"],
+                berry_only=False,
+                after_land=True,
+            )
+        else:
+            afford = _buy_planned_seeds(
+                market,
+                afford,
+                s,
+                s["seeds"],
+                berry_only=True,
+                after_land=True,
+            )
+    elif pick == "cow":
+        afford = _buy_animals(market, afford, s)
+        if not _hold_densify_for_expand(s):
+            afford = _buy_planned_seeds(
+                market, afford, s, s["seeds"], berry_only=berry_only_seeds
+            )
+    elif pick == "hire":
+        afford = _hire_up_to(market, afford, s, 1)
+        if not _hold_densify_for_expand(s):
+            afford = _buy_planned_seeds(
+                market, afford, s, s["seeds"], berry_only=berry_only_seeds
+            )
+    else:
+        afford = _buy_planned_seeds(
+            market, afford, s, s["seeds"], berry_only=berry_only_seeds
+        )
+    afford = _capital_followup(
+        market, afford, s, pick, defer_animals=defer_animals
+    )
+    return afford
+
+
 def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     cow_floor = int(PARAMS.get("cow_floor", 2))
     sheep_floor = int(PARAMS.get("sheep_floor", 2))
@@ -2592,7 +3233,21 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
     # which still needs mid-day garnish buys. Floor recovery may buy mid-day;
     # berry sheep-dip is species-gated in the candidate loop below.
     milk_led = milk_sink(s) >= 1 and berry_sink(s) == 0
-    if int(s.get("hour") or 0) != 0 and not below_floor and not milk_led:
+    # Softfloor herd ramp: mid-day cows on non-berry hollow only.
+    # Berry softfloor uses dawn capital bias (mid-day berry push wrecks densify).
+    herd_push = (
+        int(s.get("n_quads") or 0) >= 2
+        and int(s.get("day") or 0) <= int(PARAMS.get("hollow_land_day_max", 14))
+        and int(s.get("cows") or 0) < int(PARAMS.get("berry_melon_bridge_cow_cap", 8))
+        and int(s.get("empty") or 0) > int(PARAMS.get("land_hollow_soft_cap", 14))
+        and berry_sink(s) == 0
+        and (
+            milk_sink(s) >= 1
+            or egg_sink(s) >= 1
+            or int(s.get("empty") or 0) >= int(PARAMS.get("hollow_herd_deep_empty", 20))
+        )
+    )
+    if int(s.get("hour") or 0) != 0 and not below_floor and not milk_led and not herd_push:
         return afford
     if s["day"] >= PARAMS["animal_buy_day_max"] and not below_floor:
         return afford
@@ -2695,7 +3350,13 @@ def _buy_animals(market: list, afford: int, s: dict[str, Any]) -> int:
         unit = ANIMAL_COST[kind]
         if mouths_of(s) + 1 > mouth_cap:
             continue
-        n = min(want_need, 1, afford // unit)
+        if kind == "COW" and _post_land2_herd_burst(s) and want_need >= 1:
+            burst = max(1, int(PARAMS.get("post_land2_cow_burst", 2)))
+            wheat_head = max(0, int(s["crops"].get("WHEAT", 0) or 0) - mouths_of(s))
+            mouth_head = max(0, mouth_cap - mouths_of(s))
+            n = min(burst, afford // unit, mouth_head, max(1, wheat_head))
+        else:
+            n = min(want_need, 1, afford // unit)
         if n <= 0:
             continue
         market.append(["BUY_ANIMAL", kind, n])
@@ -2967,9 +3628,22 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         land_npv = _land_project_npv(s2, afford)
         cow_ev = _cow_project_score(s2) if not tp.defer_animals else 0.0
         seed_ev, n_seeds = _seed_project_score(s2)
-        can_land = land_npv > 0
+        hire_ev = _hire_project_score(s2, afford)
+        land_npv, cow_ev, seed_ev = _apply_hollow_capital_bias(
+            s2,
+            land_npv=land_npv,
+            cow_ev=cow_ev,
+            seed_ev=seed_ev,
+            defer_animals=bool(tp.defer_animals),
+        )
+        can_land = land_npv > 0 or (s2["n_quads"] == 1 and _will_buy_land(s2, afford))
+        if s2["n_quads"] == 1 and can_land and land_npv <= 0:
+            land_npv = 1.0
         can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
-        can_seed = seed_ev > 0
+        can_seed = seed_ev > 0 and _seed_allowed_during_hollow(
+            s2, land_npv=land_npv, cow_ev=cow_ev, afford=afford
+        )
+        can_hire = hire_ev > 0 and afford >= fib_hire_cost(int(s2.get("hires_today") or 0))
         la = _lookahead_project_scores(
             s2,
             afford,
@@ -2983,8 +3657,19 @@ def market_for(s: dict[str, Any], mode: str) -> list:
                 land_npv = float(la.get("land", 0.0))
                 cow_ev = float(la.get("cow", 0.0)) if not tp.defer_animals else 0.0
                 seed_ev = float(la.get("seed", 0.0))
+                land_npv, cow_ev, seed_ev = _apply_hollow_capital_bias(
+                    s2,
+                    land_npv=land_npv,
+                    cow_ev=cow_ev,
+                    seed_ev=seed_ev,
+                    defer_animals=bool(tp.defer_animals),
+                )
                 can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
-                can_seed = seed_ev > 0
+                can_seed = seed_ev > 0 and _seed_allowed_during_hollow(
+                    s2, land_npv=land_npv, cow_ev=cow_ev, afford=afford
+                )
+                if s2["n_quads"] == 1 and can_land and land_npv <= 0:
+                    land_npv = 1.0
         pick = choose_project(
             land_npv=land_npv,
             can_land=can_land,
@@ -2992,18 +3677,17 @@ def market_for(s: dict[str, Any], mode: str) -> list:
             can_cow=can_cow,
             seed_ev=seed_ev,
             can_seed=can_seed,
+            hire_ev=hire_ev,
+            can_hire=can_hire,
         )
-        if pick == "land":
-            afford = _maybe_buy_land(market, afford, s2)
-            afford = _buy_planned_seeds(
-                market, afford, s2, s2["seeds"], berry_only=True, after_land=True
-            )
-        elif pick == "cow":
-            afford = _buy_animals(market, afford, s2)
-        else:
-            afford = _buy_planned_seeds(
-                market, afford, s2, s2["seeds"], berry_only=True
-            )
+        afford = _execute_capital_pick(
+            market,
+            afford,
+            s2,
+            pick,
+            defer_animals=bool(tp.defer_animals),
+            berry_only_seeds=True,
+        )
         afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
         afford = _buy_feed_wheat(market, afford, s2)
         return _pack_market(market)
@@ -3016,17 +3700,50 @@ def market_for(s: dict[str, Any], mode: str) -> list:
             hire_cap=tp.profile.hire_cap,
         )
         afford = _hire_up_to(market, afford, s2, hire_n)
+        # Allow land/cow NPV during prep so we do not skip expand-while-hollow.
+        land_npv = _land_project_npv(s2, afford)
+        cow_ev = 0.0 if tp.defer_animals else _cow_project_score(s2)
+        seed_ev, _n = _seed_project_score(s2)
+        land_npv, cow_ev, seed_ev = _apply_hollow_capital_bias(
+            s2,
+            land_npv=land_npv,
+            cow_ev=cow_ev,
+            seed_ev=seed_ev,
+            defer_animals=bool(tp.defer_animals),
+        )
+        can_land = land_npv > 0 and _will_buy_land(s2, afford)
+        can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
+        pick = choose_project(
+            land_npv=land_npv,
+            can_land=can_land,
+            cow_ev=cow_ev,
+            can_cow=can_cow,
+            seed_ev=0.0,
+            can_seed=False,
+            hire_ev=0.0,
+            can_hire=False,
+        )
+        if pick in ("land", "cow"):
+            afford = _execute_capital_pick(
+                market,
+                afford,
+                s2,
+                pick,
+                defer_animals=bool(tp.defer_animals),
+                berry_only_seeds=True,
+            )
         afford = _buy_berry_prep_seeds(market, afford, s2, s2["seeds"])
         afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
         return _pack_market(market)
 
-    # Hire first so day_plantable reflects the crew we can afford.
+    # Hire first so expansion NPV sees the crew we can afford.
     hire_n = _crew_hire_n(s2, market, reserve_land=need_land(s2))
     afford = _hire_up_to(market, afford, s2, hire_n)
 
     land_npv = _land_project_npv(s2, afford)
     cow_ev = 0.0 if tp.defer_animals else _cow_project_score(s2)
     seed_ev, n_seeds = _seed_project_score(s2)
+    hire_ev = _hire_project_score(s2, afford)
     # Pizza / milk stack: mouths outrank tomato seed stockpiles.
     if (
         current_engine(s2) == "MILK"
@@ -3035,12 +3752,50 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         and not tp.defer_animals
     ):
         cow_ev = max(cow_ev, seed_ev + 1.0)
-    # 1→2 land is survival; keep it eligible even if NPV is soft.
+    # Dawn herd bias on hollow boards (replaces mid-day herd_push).
+    # Berry-only requires deep empty so densify printers (42/7) keep seed priority.
+    if (
+        cow_ev > 0
+        and not tp.defer_animals
+        and int(s2.get("n_quads") or 0) >= 2
+        and int(s2.get("day") or 0) <= int(PARAMS.get("hollow_land_day_max", 14))
+        and int(s2.get("cows") or 0) < int(PARAMS.get("berry_melon_bridge_cow_cap", 8))
+        and int(s2.get("empty") or 0) > int(PARAMS.get("land_hollow_soft_cap", 14))
+        and (
+            int(s2.get("empty") or 0) >= int(PARAMS.get("hollow_herd_deep_empty", 20))
+            or milk_sink(s2) >= 1
+            or (egg_sink(s2) >= 1 and berry_sink(s2) == 0)
+        )
+    ):
+        cow_ev = max(cow_ev, seed_ev + float(PARAMS.get("hollow_land_priority_boost", 1.0)))
+    # Softfloor milk+berry herd: while still hollow, cows before densify seeds.
+    if (
+        milk_sink(s2) >= 1
+        and berry_sink(s2) >= 1
+        and int(s2.get("n_quads") or 0) >= 2
+        and int(s2.get("day") or 0) <= 12
+        and int(s2.get("cows") or 0) < int(PARAMS.get("berry_melon_bridge_cow_cap", 8))
+        and int(s2.get("empty") or 0) > int(PARAMS.get("land_hollow_soft_cap", 14))
+        and cow_ev > 0
+        and not tp.defer_animals
+    ):
+        cow_ev = max(cow_ev, seed_ev + 1.0)
+    land_npv, cow_ev, seed_ev = _apply_hollow_capital_bias(
+        s2,
+        land_npv=land_npv,
+        cow_ev=cow_ev,
+        seed_ev=seed_ev,
+        defer_animals=bool(tp.defer_animals),
+    )
+    # 1→2 land is survival; plot-3+ relies on expansion NPV.
     can_land = land_npv > 0 or (s2["n_quads"] == 1 and _will_buy_land(s2, afford))
-    if s2["n_quads"] == 1 and can_land and land_npv <= 0:
+    if can_land and land_npv <= 0 and s2["n_quads"] == 1:
         land_npv = 1.0
     can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
-    can_seed = seed_ev > 0
+    can_seed = seed_ev > 0 and _seed_allowed_during_hollow(
+        s2, land_npv=land_npv, cow_ev=cow_ev, afford=afford
+    )
+    can_hire = hire_ev > 0 and afford >= fib_hire_cost(int(s2.get("hires_today") or 0))
 
     # 2–5 day bucket look-ahead for capital choice (shadow or live).
     la = _lookahead_project_scores(
@@ -3059,11 +3814,19 @@ def market_for(s: dict[str, Any], mode: str) -> list:
             land_npv = float(la.get("land", 0.0))
             cow_ev = float(la.get("cow", 0.0)) if not tp.defer_animals else 0.0
             seed_ev = float(la.get("seed", 0.0))
-            # Soft 1→2 unlock: keep land eligible when gates say buy.
-            if s2["n_quads"] == 1 and can_land and land_npv <= 0:
+            land_npv, cow_ev, seed_ev = _apply_hollow_capital_bias(
+                s2,
+                land_npv=land_npv,
+                cow_ev=cow_ev,
+                seed_ev=seed_ev,
+                defer_animals=bool(tp.defer_animals),
+            )
+            if can_land and land_npv <= 0 and s2["n_quads"] == 1:
                 land_npv = 1.0
             can_cow = cow_ev > 0 and afford >= ANIMAL_COST["COW"]
-            can_seed = seed_ev > 0
+            can_seed = seed_ev > 0 and _seed_allowed_during_hollow(
+                s2, land_npv=land_npv, cow_ev=cow_ev, afford=afford
+            )
     # Shadow mode: still execute closed-form; look-ahead is computed for parity.
 
     pick = choose_project(
@@ -3073,18 +3836,18 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         can_cow=can_cow,
         seed_ev=seed_ev,
         can_seed=can_seed,
+        hire_ev=hire_ev,
+        can_hire=can_hire,
     )
 
-    if pick == "land":
-        afford = _maybe_buy_land(market, afford, s2)
-        afford = _buy_planned_seeds(
-            market, afford, s2, s2["seeds"], berry_only=True, after_land=True
-        )
-    elif pick == "cow":
-        afford = _buy_animals(market, afford, s2)
-        afford = _buy_planned_seeds(market, afford, s2, s2["seeds"])
-    else:
-        afford = _buy_planned_seeds(market, afford, s2, s2["seeds"])
+    afford = _execute_capital_pick(
+        market,
+        afford,
+        s2,
+        pick,
+        defer_animals=bool(tp.defer_animals),
+        berry_only_seeds=False,
+    )
 
     afford = _buy_wheat_seeds(market, afford, s2, s2["seeds"])
     afford = _buy_feed_wheat(market, afford, s2)

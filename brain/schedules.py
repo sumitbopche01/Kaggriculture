@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-# Prefer elite external winners (top5 + $70k+ non-self) over the
-# self-polluted ladder dump when both exist.
+# Elite external winners for hire/dump priors. Softfloor $100k corpus is used
+# for land2 day docs / calendar steal (see analysis/plot3_steal_*.md) but its
+# early hire curve is thinner and crashes densify if loaded wholesale.
 _ELITE = ROOT / "analysis" / "schedules_by_archetype_elite.json"
 _DEFAULT = ROOT / "analysis" / "schedules_by_archetype.json"
 DEFAULT_PATH = _ELITE if _ELITE.is_file() else _DEFAULT

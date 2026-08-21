@@ -119,10 +119,8 @@ class MilkHerdTests(unittest.TestCase):
             first_milk_day=3,
         )
         self.assertEqual(M.current_engine(s), "BERRY")
-        self.assertEqual(cow_target(s, M.PARAMS), 2)
-        self.assertEqual(M.want_cows(s), 2)
-
-    def test_pizza_then_ice_cream_still_scales_cows(self):
+        self.assertEqual(cow_target(s, M.PARAMS), 10)
+        self.assertEqual(M.want_cows(s), 3)
         s = make_s(
             day=10,
             n_quads=2,
@@ -153,8 +151,9 @@ class MilkHerdTests(unittest.TestCase):
             first_milk_day=15,
         )
         self.assertEqual(M.current_engine(s), "BERRY")
-        self.assertEqual(cow_target(s, M.PARAMS), 2)
-        self.assertEqual(M.want_cows(s), 2)
+        self.assertEqual(cow_target(s, M.PARAMS), 10)
+        # Day 16 is past the schedule herd window; EV may still hold at floor.
+        self.assertGreaterEqual(cow_target(s, M.PARAMS), 8)
 
     def test_milk_engine_market_fronts_cows(self):
         s = make_s(
@@ -177,7 +176,8 @@ class MilkHerdTests(unittest.TestCase):
             any(a and a[0] == "BUY_ANIMAL" and a[1] == "COW" for a in market)
         )
 
-    def test_berry_engine_market_does_not_front_cows(self):
+    def test_berry_engine_market_can_schedule_cows(self):
+        """Ice-cream softfloor maps schedule ~8–10 cows; market may buy."""
         s = make_s(
             day=10,
             hour=0,
@@ -187,14 +187,15 @@ class MilkHerdTests(unittest.TestCase):
             cows=2,
             sheep=2,
             shops=["ICE_CREAM_SHOP", "PIZZA_SHOP"],
-            crops={"WHEAT": 8, "STRAWBERRY": 8},
+            crops={"WHEAT": 8, "STRAWBERRY": 8, "MELON": 6},
             shed={"WHEAT": 6},
             prices={**M.BASE_PRICE, "MILK": 160},
             first_berry_day=3,
             first_milk_day=3,
         )
+        self.assertGreaterEqual(cow_target(s, M.PARAMS), 8)
         market = M.market_for(s, "ENGINE")
-        self.assertFalse(
+        self.assertTrue(
             any(a and a[0] == "BUY_ANIMAL" and a[1] == "COW" for a in market)
         )
 
@@ -414,7 +415,7 @@ class PrimaryHelperTests(unittest.TestCase):
             first_milk_day=3,
         )
         self.assertEqual(M.current_engine(s), "BERRY")
-        self.assertEqual(cow_target(s, M.PARAMS), 6)
+        self.assertEqual(cow_target(s, M.PARAMS), 10)
         self.assertEqual(M.want_cows(s), 3)
 
     def test_crop_plan_keeps_engine_strawberry_when_late_ev_zero(self):

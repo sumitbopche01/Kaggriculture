@@ -1,15 +1,12 @@
 """Ladder proxy: win rate + margin vs strong opponents (not just mean vs starter).
 
-Ladder cares about beating diverse bots. Local mean$ vs starter can invert
-true strength. This harness runs our agent against frozen/local packages and
-reports WR, mean margin, and mean scores.
+Ladder cares about beating diverse bots. Local densify mean$ vs starter can
+invert true strength. After any mean15/dual move, re-run:
 
-Usage:
-  .venv/bin/python -m tune.ladder
-  .venv/bin/python -m tune.ladder --opponents starter,frozen_73k6 --seedSet ladder20
-  .venv/bin/python -m tune.ladder --opponents opponents/frozen_73k6/main.py --both-seats
+  .venv/bin/python -m tune.ladder --seedSet ladder20 --opponents frozen_73k6
+  .venv/bin/python -m tune.ladder --seedSet holdout --opponents frozen_73k6
 
-Drop external submissions under opponents/<name>/ with main.py (+ brain/).
+Also: softfloor / holdout seed sets from tune.evaluate.
 """
 
 from __future__ import annotations
@@ -23,7 +20,14 @@ from typing import Iterable
 
 from kaggle_environments import make
 
-from tune.evaluate import MEAN_SEEDS_15, TUNE_SEEDS_30, TUNE_SEEDS_60
+from tune.evaluate import (
+    HOLDOUT_SEEDS,
+    MEAN_SEEDS_15,
+    MEAN_SEEDS_30,
+    SOFTFLOOR_SEEDS,
+    TUNE_SEEDS_30,
+    TUNE_SEEDS_60,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 OUR_AGENT = str(ROOT / "main.py")
@@ -252,7 +256,7 @@ def main() -> None:
     p.add_argument(
         "--seedSet",
         default="ladder20",
-        choices=["ladder20", "mean15", "tune30", "tune60"],
+        choices=["ladder20", "mean15", "mean30", "softfloor", "holdout", "tune30", "tune60"],
     )
     p.add_argument("--seedCount", type=int, default=0, help="0 = all in seedSet")
     p.add_argument(
@@ -283,6 +287,12 @@ def main() -> None:
         seeds_src = LADDER_SEEDS_20
     elif args.seedSet == "mean15":
         seeds_src = MEAN_SEEDS_15
+    elif args.seedSet == "mean30":
+        seeds_src = MEAN_SEEDS_30
+    elif args.seedSet == "softfloor":
+        seeds_src = SOFTFLOOR_SEEDS
+    elif args.seedSet == "holdout":
+        seeds_src = HOLDOUT_SEEDS
     elif args.seedSet == "tune30":
         seeds_src = TUNE_SEEDS_30
     else:

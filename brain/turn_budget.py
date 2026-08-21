@@ -118,9 +118,9 @@ def land_fillable_tiles(
 ) -> int:
     """Tiles plantable on a new plot before the engine ends.
 
-    Plot 3+ (short_horizon): only the next two dawns after live water debt —
-    packed printers correctly score ~0. 1→2: two-dawn residual plus free
-    tiles/day afterward so a full first quad can still unlock expansion.
+    Full horizon (default): two-dawn residual after live water debt, then
+    free hands each remaining day — used for plot-3/4 expansion NPV.
+    short_horizon=True keeps the old two-dawn-only residual (packed printers).
     """
     free = max(0, int(workers) - int(hungry))
     live = max(0, int(live_tiles))
@@ -139,18 +139,216 @@ def skip_days_after_land(*, live_tiles: int, extra_empty: int, workers: int) -> 
     return backlog / float(w)
 
 
+def hollow_expand_window(
+    *,
+    n_quads: int,
+    empty: int,
+    soft_cap: int = 14,
+    hollow_max: int = 45,
+) -> bool:
+    """Softfloor mid-hollow board: expand before packing (not packed printers)."""
+    if int(n_quads) != 2:
+        return False
+    empty_n = int(empty)
+    return int(soft_cap) < empty_n <= int(hollow_max)
+
+
+def live_tiles_for_hollow_expand(
+    *,
+    live_tiles: int,
+    workers: int,
+    hungry: int = 0,
+    live_cap_factor: float = 1.35,
+) -> int:
+    """Cap live stand for expand NPV so mid-ramp densify does not zero spare labor.
+
+    Softfloor buys plot-3 with a modest stand and spare crew. If we already
+    planted into a fat stand on a hollow board, raw live/2 kills plant_per_day
+    and NPV refuses land — the densify trap. Packed printers never enter the
+    hollow window (empty ≤ soft_cap), so they keep full live and stay put.
+    """
+    live = max(0, int(live_tiles))
+    free = max(0, int(workers) - max(0, int(hungry)))
+    cap = max(8, int(float(free) * max(0.5, float(live_cap_factor))))
+    return min(live, cap)
+
+
+def expand_vs_stay_advantage(
+    *,
+    workers: int,
+    hungry: int = 0,
+    live_tiles: int,
+    productive_days: int,
+    tile_ev: float,
+    land_cost: int,
+    seed_cost: int,
+    empty: int = 0,
+    hire_n: int = 0,
+    hire_cost_total: int = 0,
+    new_empty: int = 25,
+    stand_factor: float = 1.0,
+    realize: float = 0.7,
+    margin: float = 0.0,
+    # Multi-stream extras (berries/milk/eggs/wool/inventory).
+    animal_unlock_ev: float = 0.0,
+    inventory_ev: float = 0.0,
+) -> float:
+    """Long-term profit: expand (+new_empty) minus stay-and-densify.
+
+    Returns advantage (expand_net - stay_net). Buy land only when > margin.
+
+    Spare planting rate after watering the live stand:
+      plant_per_day ≈ max(0, free - live/2)
+    If spare is ~0 (fat packed printer), incremental tiles from a new plot
+    cannot be worked → advantage ≤ 0 (stay put). Softfloor hollow boards
+    with spare crew clear land cost and score positive.
+
+    `tile_ev` should already be the blended crop fill EV (berry/tomato/…).
+    `animal_unlock_ev` credits milk/egg/wool mouths the new plot can host,
+    scaled by spare labor so packed printers still stay put.
+    """
+    w = max(0, int(workers) + max(0, int(hire_n)))
+    h = max(0, int(hungry))
+    free = max(0, w - h)
+    live = max(0, int(live_tiles))
+    days = max(0, int(productive_days))
+    empty_n = max(0, int(empty))
+    extra = max(0, int(new_empty))
+    if days <= 0 or free <= 0:
+        return 0.0
+
+    # Daily plant residual after ~half the crew waters the live stand.
+    plant_per_day = max(0.0, float(free) - float(live) / 2.0)
+    labor_cap = plant_per_day * float(days)
+    if labor_cap <= 0:
+        return 0.0
+
+    stay_plant = min(float(empty_n), labor_cap)
+    expand_plant = min(float(empty_n + extra), labor_cap)
+    incremental = expand_plant - stay_plant
+    if incremental <= 0:
+        return 0.0
+
+    ev = max(0.0, float(tile_ev)) * max(0.0, min(1.5, float(stand_factor)))
+    # Incremental tiles come online after current empties are filled.
+    days_clear_old = stay_plant / plant_per_day if plant_per_day > 0 else float(days)
+    days_incr = incremental / plant_per_day if plant_per_day > 0 else float(days)
+    avg_prod = max(1.0, float(days) - days_clear_old - 0.5 * days_incr)
+    realized = incremental * ev * avg_prod * max(0.1, min(1.0, float(realize)))
+
+    # Diverting plant days onto the new plot softens live-stand uptime.
+    divert = min(float(days), days_incr)
+    damage = float(live) * ev * divert * 0.35
+
+    # Animal unlock only when crew can actually work the new plot.
+    labor_scale = min(1.0, plant_per_day / 3.0)
+    animal_credit = max(0.0, float(animal_unlock_ev)) * labor_scale
+    # Inventory is identical stay vs expand — omit from advantage (kept for API).
+    del inventory_ev
+
+    wave = min(int(incremental), max(8, 2 * free))
+    cost = (
+        int(land_cost)
+        + wave * max(0, int(seed_cost))
+        + max(0, int(hire_cost_total))
+    )
+    return (
+        realized
+        + animal_credit
+        - float(cost)
+        - damage
+        - max(0.0, float(margin))
+    )
+
+def expansion_project_npv(
+    *,
+    workers: int,
+    hungry: int = 0,
+    live_tiles: int,
+    productive_days: int,
+    tile_ev: float,
+    land_cost: int,
+    seed_cost: int,
+    empty: int = 0,
+    hire_n: int = 0,
+    hire_cost_total: int = 0,
+    new_empty: int = 25,
+    hollow_soft_cap: int = 14,
+    hollow_penalty_k: float = 4.0,
+    stand_factor: float = 1.0,
+    realize: float = 0.7,
+    animal_unlock_ev: float = 0.0,
+    inventory_ev: float = 0.0,
+    margin: float = 0.0,
+) -> float:
+    """NPV of buying the next plot vs staying put (long-term profit).
+
+    Prefer expand_vs_stay_advantage. hollow_* kept for API compatibility;
+    spare-labor compare replaces packed short-horizon / hollow hard pens.
+    """
+    del hollow_soft_cap, hollow_penalty_k  # unused — stay/expand EV replaces them
+    return expand_vs_stay_advantage(
+        workers=workers,
+        hungry=hungry,
+        live_tiles=live_tiles,
+        productive_days=productive_days,
+        tile_ev=tile_ev,
+        land_cost=land_cost,
+        seed_cost=seed_cost,
+        empty=empty,
+        hire_n=hire_n,
+        hire_cost_total=hire_cost_total,
+        new_empty=new_empty,
+        stand_factor=stand_factor,
+        realize=realize,
+        margin=margin,
+        animal_unlock_ev=animal_unlock_ev,
+        inventory_ev=inventory_ev,
+    )
+
+
 def land_expansion_npv(
     *,
-    plantable_new: int,
+    plantable_new: int | None = None,
     tile_ev: float,
     productive_days: int,
     land_cost: int,
     seed_cost: int,
     live_tiles: int,
-    skip_days: float,
+    skip_days: float = 0.0,
+    # Preferred expansion API (when workers is set, plantable_new is ignored).
+    workers: int | None = None,
+    hungry: int = 0,
+    empty: int = 0,
+    hire_n: int = 0,
+    hire_cost_total: int = 0,
+    new_empty: int = 25,
+    hollow_soft_cap: int = 14,
+    hollow_penalty_k: float = 4.0,
+    stand_factor: float = 1.0,
+    realize: float = 0.7,
 ) -> float:
-    """NPV of the next quad using dawn-capacity tiles, not fantasy 25."""
-    fill_n = max(0, int(plantable_new))
+    """NPV of the next quad — prefers multi-dawn expansion_project_npv."""
+    if workers is not None:
+        return expansion_project_npv(
+            workers=int(workers),
+            hungry=hungry,
+            live_tiles=live_tiles,
+            productive_days=productive_days,
+            tile_ev=tile_ev,
+            land_cost=land_cost,
+            seed_cost=seed_cost,
+            empty=empty,
+            hire_n=hire_n,
+            hire_cost_total=hire_cost_total,
+            new_empty=new_empty,
+            hollow_soft_cap=hollow_soft_cap,
+            hollow_penalty_k=hollow_penalty_k,
+            stand_factor=stand_factor,
+            realize=realize,
+        )
+    # Legacy two-dawn path (tests / callers that only pass plantable_new).
+    fill_n = max(0, int(plantable_new or 0))
     ev = max(0.0, float(tile_ev))
     days = max(0, int(productive_days))
     realized = fill_n * ev * days
