@@ -2134,6 +2134,11 @@ def want_hands(s: dict[str, Any]) -> int:
         from brain.schedules import hire_target_day
 
         need = max(need, hire_target_day(int(s["day"]), default=base))
+    # Softfloor router: top5/hamburger crew (≥10 by d7–8) while hollow.
+    if _softfloor_mode(s) and int(s["day"]) <= 12:
+        from brain.schedules import softfloor_hire_target_day
+
+        need = max(need, softfloor_hire_target_day(int(s["day"]), default=9))
     if _land2_crew_spike(s):
         need = max(need, int(PARAMS.get("land2_hire_target", 13)))
     return min(MAX_HANDS, max(base, need))

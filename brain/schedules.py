@@ -1,32 +1,35 @@
-"""Schedule priors mined from strong ladder replays.
+"""Schedule priors mined from strong ladder / top-player replays.
 
-`analysis/mine_schedules.py` writes `schedules_by_archetype.json`.
+`analysis/mine_schedules.py` writes `schedules_by_archetype_*.json`.
 This module loads those medians so policy can steal hire/land/dump/herd
 timing instead of only tuning against starter.
 
-Live softfloor H2H curves (structured / frontier_soil / top10_read on
-softfloor seeds, 2026-08-21): cows d6:3 → d7:6 → d8:7 → d9:8 → d11:10;
-land2 ≈ d10; dump ≈ d28–29; berry peak ≈ 33–36 while filling empties.
+Corpora (2026-08-21):
+  - elite / ladder85k: land2≈10.5, cows≈9.5, dump≈27.5, hire thick early
+  - top5: land2≈10, berry≈32, dump≈29, full crew≈d7
+  - softfloor $100k: land2≈10, cows≈8, berry≈35, dump≈28, hands≈13
+  - Live H2H boatlee/kaito: cows d6:3 → d7:6 → d8:8; land [6,10]; dump d29
+  - Live H2H hamburger: cows@10=6, berry≈39, land [7,10], hands@8≈11
 """
 
 from __future__ import annotations
 
 import json
+import statistics
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-# Elite external winners for hire/dump priors. Softfloor $100k corpus is used
-# for land2 day docs / calendar steal (see analysis/plot3_steal_*.md) but its
-# early hire curve is thinner and crashes densify if loaded wholesale.
+# Elite external winners for hire priors. Softfloor / top5 used for dump + land2.
 _ELITE = ROOT / "analysis" / "schedules_by_archetype_elite.json"
 _SOFTFLOOR = ROOT / "analysis" / "schedules_by_archetype_softfloor100k.json"
+_TOP5 = ROOT / "analysis" / "schedules_by_archetype_top5.json"
 _DEFAULT = ROOT / "analysis" / "schedules_by_archetype.json"
 DEFAULT_PATH = _ELITE if _ELITE.is_file() else _DEFAULT
 
-# Post-land1 herd ramp stolen from softfloor elites (median across 9 bot×seed).
-# Densify printers fill empties fast; schedule only applies while empty is soft.
+# Post-land1 herd ramp: boatlee_v16 / kaito_v27 live median (5 seeds).
+# Softfloor router only; densify printers stay off this curve.
 _SOFTFLOOR_COW_BY_DAY: dict[int, int] = {
     0: 3,
     1: 3,
@@ -36,7 +39,7 @@ _SOFTFLOOR_COW_BY_DAY: dict[int, int] = {
     5: 3,
     6: 3,
     7: 6,
-    8: 7,
+    8: 8,
     9: 8,
     10: 8,
     11: 10,
@@ -72,13 +75,32 @@ def berry_land2_strawberry_floor(default: int = 16) -> int:
     return max(8, min(int(default), int(round(float(peak) - 1))))
 
 
+def _median_prior_field(field: str, paths: tuple[Path, ...]) -> float | None:
+    vals: list[float] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        p = data.get("BERRY") or data.get("ALL") or {}
+        d = p.get(field)
+        if d is not None:
+            vals.append(float(d))
+    if not vals:
+        return None
+    return float(statistics.median(vals))
+
+
 def berry_land2_day(default: int = 10) -> int:
-    """Median day winners unlock plot-3 (ladder elites ≈ 10–11)."""
-    p = prior_for("BERRY")
-    d = p.get("median_land2_day")
+    """Median day winners unlock plot-3 (top5/softfloor/elite ≈ 10–11)."""
+    d = _median_prior_field(
+        "median_land2_day", (_SOFTFLOOR, _TOP5, DEFAULT_PATH)
+    )
     if d is None:
         return int(default)
-    return int(round(float(d)))
+    return int(round(d))
 
 
 def berry_cow_cap(default: int = 6) -> int:
@@ -93,19 +115,13 @@ def berry_cow_cap(default: int = 6) -> int:
 
 
 def late_dump_day(default: int = 27) -> int:
-    """Prefer softfloor dump median (~28) when corpus exists; else elite."""
-    for path in (_SOFTFLOOR, DEFAULT_PATH):
-        if not path.is_file():
-            continue
-        try:
-            data = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        p = data.get("BERRY") or data.get("ALL") or {}
-        d = p.get("median_dump_day")
-        if d is not None:
-            return int(round(float(d)))
-    return int(default)
+    """Blend softfloor (~28) + top5 (~29) + elite (~27.5) dump medians."""
+    d = _median_prior_field(
+        "median_dump_day", (_SOFTFLOOR, _TOP5, DEFAULT_PATH)
+    )
+    if d is None:
+        return int(default)
+    return int(round(d))
 
 
 def softfloor_cow_target_day(day: int, cap: int = 8) -> int:
@@ -115,6 +131,24 @@ def softfloor_cow_target_day(day: int, cap: int = 8) -> int:
     if raw is None:
         raw = 10 if d > 12 else int(cap)
     return max(0, min(int(cap) if d <= 10 else max(int(cap), 10), int(raw)))
+
+
+def softfloor_hire_target_day(day: int, default: int = 9) -> int:
+    """Top5/hamburger-style crew on softfloor boards (full crew ≈ d7–8)."""
+    # Prefer top5 curve (thicker than softfloor early hire which crashes densify).
+    for path in (_TOP5, _ELITE):
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        p = data.get("BERRY") or data.get("ALL") or {}
+        curve = p.get("hire_curve_median") or {}
+        v = curve.get(str(int(day)))
+        if v is not None:
+            return max(0, int(round(float(v))))
+    return int(default)
 
 
 def hire_target_day(day: int, default: int = 5) -> int:
