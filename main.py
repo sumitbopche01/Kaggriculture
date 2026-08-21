@@ -25,6 +25,7 @@ from brain.map import (
     land_ramp_relax_active,
     maybe_reclassify_archetype,
     resolve_strategy,
+    softfloor_mode_active,
     strategy_allows_berry_prep,
     strategy_land_empty_cap,
     strategy_quad1_empty_cap,
@@ -259,11 +260,16 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "hollow_land_npv_min": 5000,
     "hollow_preserve_empty_pad": 2,
     "hollow_preland_stand_cap": 20,
-    # Softfloor steal: labor-gated hollow plot-3; dawn burst off by default
-    # (burst alone crashes densify 7/42 — enable only with map classifier).
+    # Softfloor herd burst: mined curve in brain.schedules.softfloor_cow_target_day.
+    # Global day_max stays -1; softfloor_mode router enables via softfloor_herd_day_max.
     "land2_hollow_cow_min": 4,
-    "post_land2_cow_burst": 1,
+    "post_land2_cow_burst": 2,
     "post_land2_cow_day_max": -1,
+    "softfloor_herd_enabled": 1,
+    "softfloor_herd_day_max": 10,
+    "softfloor_herd_empty_min": 16,
+    "softfloor_herd_day_min": 7,
+    "softfloor_fill_empty_min": 16,
     "hollow_plot3_fill_frac": 0.35,
     # Post-plot-3 crew spike (frontier ~14 hires on land2 day)
     "land2_hire_target": 13,
@@ -320,6 +326,17 @@ DEFAULT_PARAMS: dict[str, int | float] = {
     "berry_prep_seed_tiles": 10,
     "berry_prep_cash_keep": 800,
     "berry_prep_max_seed_spend": 1200,
+    # Softfloor elites plant berry from ~d6 on pizza/bakery before berry shops.
+    # Gated by softfloor_router (EARLY_BERRY densify stays off).
+    "softfloor_router_enabled": 1,
+    "softfloor_router_day_min": 6,
+    "softfloor_router_day_max": 18,
+    "softfloor_speculative_berry": 1,
+    "softfloor_berry_day_min": 6,
+    "softfloor_berry_day_max": 18,
+    "softfloor_berry_money_min": 600,
+    "softfloor_berry_cap": 36,
+    "softfloor_berry_seed_tiles": 24,
     # P3: market intelligence
     "glut_block_threshold": 0.35,
     "spike_harvest_mult": 1.35,
@@ -647,10 +664,68 @@ def _cash_deficit(s: dict[str, Any]) -> float:
     return max(0.0, planned_seed_spend - float(s.get("money", 0)))
 
 
+def _softfloor_mode(s: dict[str, Any]) -> bool:
+    """True when map router allows softfloor schedule steals.
+
+    Adds a labor gate on top of softfloor_mode_active so densify boards that
+    briefly look hollow (high day_plantable) stay on densify priorities.
+    Deep hollow (empty ≥ hollow_herd_deep_empty) always qualifies.
+    """
+    if not softfloor_mode_active(s, map_strategy(s), PARAMS):
+        return False
+    empty = int(s.get("empty") or 0)
+    if empty >= int(PARAMS.get("hollow_herd_deep_empty", 20)):
+        return True
+    return _hollow_plot3_labor_ok(s)
+
+
+def _softfloor_speculative_berry(s: dict[str, Any]) -> bool:
+    """Plant strawberries before berry shops — softfloor elite schedule.
+
+    Live H2H on seed 33: structured/frontier plant berry from d6 with only
+    pizza/bakery unlocked and score 135k–172k; we wait for berry shops, plant
+    tomato, and stall hollow (~64k). Shop unlock order is path-dependent, so
+    speculative berry also steers unlocks toward FM/smoothie.
+    """
+    if int(PARAMS.get("softfloor_speculative_berry", 1)) != 1:
+        return False
+    if not _softfloor_mode(s):
+        return False
+    if berry_sink(s) > 0:
+        return False
+    day = int(s.get("day") or 0)
+    if day < int(PARAMS.get("softfloor_berry_day_min", 6)):
+        return False
+    if day > int(PARAMS.get("softfloor_berry_day_max", 18)):
+        return False
+    if float(s.get("money", 0)) < float(PARAMS.get("softfloor_berry_money_min", 600)):
+        return False
+    shops = set(s.get("shops") or [])
+    # Require pizza — bakery-only LATE_BERRY densify must not steal this path.
+    return "PIZZA_SHOP" in shops
+
+
+def _softfloor_berry_plant_push(s: dict[str, Any], seeds: dict[str, int]) -> bool:
+    """Plant held strawberry seeds on routed softfloor hollow boards."""
+    if seeds.get("STRAWBERRY", 0) <= 0:
+        return False
+    if berry_sink(s) > 0:
+        return False
+    if not softfloor_mode_active(s, map_strategy(s), PARAMS):
+        return False
+    if int(s.get("empty") or 0) < int(PARAMS.get("softfloor_fill_empty_min", 16)):
+        return False
+    if int(s.get("day") or 0) > int(PARAMS.get("softfloor_berry_day_max", 18)):
+        return False
+    return "PIZZA_SHOP" in set(s.get("shops") or [])
+
+
 def _berry_prep_window(s: dict[str, Any]) -> bool:
     """Day/shop/land gates for berry steering. Does not read crop_plan."""
     if int(PARAMS["berry_prep_enabled"]) != 1:
         return False
+    if _softfloor_speculative_berry(s):
+        return True
     strat = map_strategy(s)
     if strat != "UNKNOWN" and not strategy_allows_berry_prep(strat):
         return False
@@ -678,6 +753,8 @@ def berry_prep_active(s: dict[str, Any]) -> bool:
     """Reserve land/cash for strawberries when no berry shop is open yet."""
     if not _berry_prep_window(s):
         return False
+    if _softfloor_speculative_berry(s):
+        return True
     if _cash_deficit(s) >= 900:
         return False
     return True
@@ -691,7 +768,10 @@ def berry_prep_seed_need(
         return 0
     seeds = seeds if seeds is not None else s.get("seeds") or {}
     have = s["crops"].get("STRAWBERRY", 0) + int(seeds.get("STRAWBERRY", 0))
-    target = min(int(s["empty"]), int(PARAMS["berry_prep_seed_tiles"]))
+    tiles = int(PARAMS["berry_prep_seed_tiles"])
+    if _softfloor_speculative_berry(s):
+        tiles = int(PARAMS.get("softfloor_berry_seed_tiles", 24))
+    target = min(int(s["empty"]), tiles)
     return max(0, target - have)
 
 
@@ -931,31 +1011,69 @@ def _hollow_expand_window(s: dict[str, Any]) -> bool:
 
 
 def _post_land2_herd_burst(s: dict[str, Any]) -> bool:
-    """Dawn multi-cow while deep-hollow after land2 — softfloor ~8 cows by d10.
+    """Dawn multi-cow to catch softfloor post-land1 ramp (3→6→8 by d9).
 
-    Also requires crew cannot fill empties soon — densify printers that briefly
-    look hollow still have high day_plantable and must not burst.
+    Only via softfloor_mode router — global post_land2_cow_day_max stays -1 so
+    densify EARLY_BERRY never bursts.
     """
+    if int(PARAMS.get("softfloor_herd_enabled", 1)) != 1:
+        return False
+    if not _softfloor_mode(s):
+        return False
     if int(s.get("hour") or 0) != 0:
         return False
-    if int(s.get("n_quads") or 0) < 2:
+    day = int(s.get("day") or 0)
+    day_max = int(PARAMS.get("post_land2_cow_day_max", -1))
+    if day_max < 0:
+        day_max = int(PARAMS.get("softfloor_herd_day_max", 10))
+    if day > day_max:
         return False
-    if berry_sink(s) < 1:
+    if day < int(PARAMS.get("softfloor_herd_day_min", 7)):
         return False
-    empty = int(s.get("empty") or 0)
-    if empty < int(PARAMS.get("hollow_herd_deep_empty", 20)):
+    from brain.schedules import softfloor_cow_target_day
+
+    target = softfloor_cow_target_day(
+        day, cap=int(PARAMS.get("berry_melon_bridge_cow_cap", 8))
+    )
+    cows = int(s.get("cows") or 0)
+    if cows >= target:
         return False
-    if int(s.get("cows") or 0) >= int(PARAMS.get("land2_schedule_cow_min", 6)):
-        return False
-    if int(s.get("day") or 0) > int(PARAMS.get("post_land2_cow_day_max", 10)):
-        return False
-    if int(s.get("crops", {}).get("STRAWBERRY", 0) or 0) < 12 and int(
-        s.get("crops", {}).get("MELON", 0) or 0
-    ) < 6:
-        return False
-    bud = _turn_budget(s)
-    frac = float(PARAMS.get("hollow_plot3_fill_frac", 0.45))
-    return bud.day_plantable < empty * frac
+    crops = s.get("crops") or {}
+    stand_ok = (
+        int(crops.get("STRAWBERRY", 0) or 0) >= 4
+        or int(crops.get("MELON", 0) or 0) >= 4
+        or int(crops.get("TOMATO", 0) or 0) >= 4
+        or milk_sink(s) >= 1
+        or berry_sink(s) >= 1
+    )
+    return stand_ok
+
+
+def _softfloor_schedule_cow_want(s: dict[str, Any]) -> int | None:
+    """If softfloor herd window is open, return schedule cow want; else None."""
+    if int(PARAMS.get("softfloor_herd_enabled", 1)) != 1:
+        return None
+    if not _softfloor_mode(s):
+        return None
+    day = int(s.get("day") or 0)
+    if day < int(PARAMS.get("softfloor_herd_day_min", 7)):
+        return None
+    day_max = int(PARAMS.get("post_land2_cow_day_max", -1))
+    if day_max < 0:
+        day_max = int(PARAMS.get("softfloor_herd_day_max", 10))
+    if day > day_max:
+        return None
+    if not herd_can_expand(s):
+        return None
+    from brain.schedules import softfloor_cow_target_day
+
+    target = softfloor_cow_target_day(
+        day, cap=int(PARAMS.get("berry_melon_bridge_cow_cap", 8))
+    )
+    cows = int(s.get("cows") or 0)
+    if cows >= target:
+        return None
+    return min(cows + 1, target)
 
 
 def _hollow_plot3_labor_ok(s: dict[str, Any]) -> bool:
@@ -1435,6 +1553,15 @@ def crop_plan(s: dict[str, Any]) -> dict[str, int]:
             if plan_ev(s, c) > override_mult * med_ev:
                 cap_map[c] = cap_map.get(c, 0) + cap_bonus
 
+    # Softfloor speculative berry BEFORE primary tomato densify. Elites plant
+    # berry from d6 on pizza/bakery; taking tomato first left strawberry plan=0
+    # while seeds sat in inventory (seed 33).
+    if leftover > 0 and _softfloor_speculative_berry(s):
+        take(
+            "STRAWBERRY",
+            min(leftover, int(PARAMS.get("softfloor_berry_cap", 36))),
+        )
+
     if primary and primary in cap_map:
         want = cap_map[primary]
         have = int(s["crops"].get(primary, 0) or 0)
@@ -1557,6 +1684,9 @@ def cash_caps(s: dict[str, Any]) -> tuple[int, int]:
 
 def want_cows(s: dict[str, Any]) -> int:
     """Expand cows from shop target; berry path uses cow-vs-seed EV."""
+    schedule_want = _softfloor_schedule_cow_want(s)
+    if schedule_want is not None:
+        return schedule_want
     target = cow_target(s, PARAMS)
     floor = int(PARAMS["cow_floor"]) if s["day"] <= PARAMS["cow_floor_day_max"] else 0
     if s["cows"] < floor:
@@ -2289,9 +2419,14 @@ def pick_crop(s: dict[str, Any], seeds: dict[str, int]) -> str | None:
         if seeds.get(crop, 0) > 0 and s["crops"][crop] < plan.get(crop, 0)
     ]
     primary = _primary_cash(s) or "STRAWBERRY"
+    # Softfloor router: plant held strawberry seeds on hollow pizza/bakery boards.
+    if _softfloor_berry_plant_push(s, seeds):
+        return "STRAWBERRY"
     if cash:
         if primary in cash:
             return primary
+        if "STRAWBERRY" in cash and _softfloor_speculative_berry(s):
+            return "STRAWBERRY"
         return max(cash, key=lambda c: plan_ev(s, c))
     primary_gap = plant_gap(plan, s, primary)
     if (
@@ -3752,8 +3887,6 @@ def market_for(s: dict[str, Any], mode: str) -> list:
         and not tp.defer_animals
     ):
         cow_ev = max(cow_ev, seed_ev + 1.0)
-    # Dawn herd bias on hollow boards (replaces mid-day herd_push).
-    # Berry-only requires deep empty so densify printers (42/7) keep seed priority.
     if (
         cow_ev > 0
         and not tp.defer_animals

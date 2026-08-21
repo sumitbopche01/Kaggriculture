@@ -10,6 +10,10 @@ MapStrategy = Literal["UNKNOWN", "EARLY_BERRY", "LATE_BERRY", "MILK_STACK", "LAN
 
 EGG_SHOPS = frozenset({"BAKERY", "BRUNCH_SPOT"})
 
+# Archetypes that may take softfloor schedule steals (herd / speculative berry).
+# EARLY_BERRY densify printers are explicitly excluded.
+SOFTFLOOR_STRATEGIES = frozenset({"LATE_BERRY", "LAND_SPRINT", "UNKNOWN", "MILK_STACK"})
+
 
 def _shop_counts(
     shops: set[str],
@@ -134,6 +138,45 @@ def maybe_reclassify_archetype(
 def strategy_allows_berry_prep(strategy: MapStrategy) -> bool:
     # MILK_STACK is a pizza/milk town — prep strawberries there starves cows.
     return strategy in ("LATE_BERRY", "LAND_SPRINT", "UNKNOWN")
+
+
+def softfloor_mode_active(
+    s: dict[str, Any],
+    strategy: MapStrategy,
+    params: dict[str, int | float],
+) -> bool:
+    """Route softfloor schedule steals (herd ramp, speculative berry).
+
+    Densify EARLY_BERRY stays off. LAND_SPRINT/UNKNOWN/MILK_STACK need *deep*
+    hollow (empty≥20) — densify seed 55 reclassifies to LAND_SPRINT when ice
+    cream unlocks and was falsely routing at empty=16. LATE_BERRY only with
+    pizza (bakery-first densify excluded).
+    """
+    if int(params.get("softfloor_router_enabled", 1)) != 1:
+        return False
+    if strategy == "EARLY_BERRY":
+        return False
+    if strategy not in SOFTFLOOR_STRATEGIES:
+        return False
+    if int(s.get("n_quads") or 0) < 2:
+        return False
+    day = int(s.get("day") or 0)
+    if day < int(params.get("softfloor_router_day_min", 6)):
+        return False
+    if day > int(params.get("softfloor_router_day_max", 18)):
+        return False
+    empty = int(s.get("empty") or 0)
+    deep = int(params.get("hollow_herd_deep_empty", 20))
+    fill = int(params.get("softfloor_fill_empty_min", 16))
+    shops = set(s.get("shops") or [])
+
+    if strategy == "LATE_BERRY":
+        if "PIZZA_SHOP" not in shops:
+            return False
+        return empty >= fill
+
+    # LAND_SPRINT / UNKNOWN / MILK_STACK: deep hollow only.
+    return empty >= deep
 
 
 def strategy_land_ramp_relax_trigger_cap(

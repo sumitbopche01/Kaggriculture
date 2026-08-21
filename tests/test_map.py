@@ -16,6 +16,7 @@ from brain.map import (
     land_ramp_relax_active,
     maybe_reclassify_archetype,
     resolve_strategy,
+    softfloor_mode_active,
     strategy_allows_berry_prep,
     strategy_defer_animals,
     strategy_land_empty_cap,
@@ -46,6 +47,11 @@ PARAMS = {
     "map_milk_defer_milk_sink_min": 2,
     "map_milk_defer_empty_max": 14,
     "map_milk_sprint_defer_empty_max": 12,
+    "softfloor_router_enabled": 1,
+    "softfloor_router_day_min": 6,
+    "softfloor_router_day_max": 18,
+    "softfloor_fill_empty_min": 16,
+    "hollow_herd_deep_empty": 20,
 }
 
 
@@ -202,6 +208,52 @@ class ReclassifyTests(unittest.TestCase):
             new_berry_today=True,
         )
         self.assertEqual(track["archetype"], "LAND_SPRINT")
+
+
+class SoftfloorRouterTests(unittest.TestCase):
+    def test_early_berry_never_routes(self):
+        s = {"day": 8, "n_quads": 2, "empty": 28}
+        self.assertFalse(softfloor_mode_active(s, "EARLY_BERRY", PARAMS))
+
+    def test_late_berry_bakery_without_pizza_off(self):
+        """Densify seed 55 is LATE_BERRY (yarn+bakery) — must not route."""
+        s = {"day": 8, "n_quads": 2, "empty": 25, "shops": ["YARN_STORE", "BAKERY"]}
+        self.assertFalse(softfloor_mode_active(s, "LATE_BERRY", PARAMS))
+
+    def test_late_berry_with_pizza_routes(self):
+        s = {"day": 8, "n_quads": 2, "empty": 25, "shops": ["PIZZA_SHOP", "BAKERY"]}
+        self.assertTrue(softfloor_mode_active(s, "LATE_BERRY", PARAMS))
+
+    def test_unknown_hollow_routes(self):
+        s = {"day": 8, "n_quads": 2, "empty": 25}
+        self.assertTrue(softfloor_mode_active(s, "UNKNOWN", PARAMS))
+
+    def test_milk_stack_needs_deep_hollow(self):
+        shallow = {"day": 8, "n_quads": 2, "empty": 18}
+        deep = {"day": 8, "n_quads": 2, "empty": 25}
+        self.assertFalse(softfloor_mode_active(shallow, "MILK_STACK", PARAMS))
+        self.assertTrue(softfloor_mode_active(deep, "MILK_STACK", PARAMS))
+
+    def test_land_sprint_needs_deep_hollow(self):
+        """Densify seed 55 reclassifies to LAND_SPRINT at empty=16 — must not route."""
+        s = {
+            "day": 9,
+            "n_quads": 2,
+            "empty": 16,
+            "shops": ["YARN_STORE", "BAKERY", "ICE_CREAM_SHOP"],
+        }
+        self.assertFalse(softfloor_mode_active(s, "LAND_SPRINT", PARAMS))
+        s["empty"] = 25
+        self.assertTrue(softfloor_mode_active(s, "LAND_SPRINT", PARAMS))
+
+    def test_packed_board_off(self):
+        s = {"day": 8, "n_quads": 2, "empty": 10}
+        self.assertFalse(softfloor_mode_active(s, "LAND_SPRINT", PARAMS))
+
+    def test_router_disabled(self):
+        s = {"day": 8, "n_quads": 2, "empty": 25}
+        params = dict(PARAMS, softfloor_router_enabled=0)
+        self.assertFalse(softfloor_mode_active(s, "LATE_BERRY", params))
 
 
 class StrategyHelperTests(unittest.TestCase):
