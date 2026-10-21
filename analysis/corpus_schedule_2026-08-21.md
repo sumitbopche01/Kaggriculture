@@ -1,4 +1,4 @@
-# Multi-corpus schedule steal (2026-08-21)
+# Multi-corpus schedule priors (2026-08-21)
 
 ## Corpora compared
 
@@ -24,7 +24,7 @@ Hire early (d0/3/6/8/10): elite 5/8/9/9/9 — top5 6/7/7/9/10 — softfloor 5/5/
 
 Boatlee/kaito cow median: d6:3 → d7:6 → **d8:8** (faster than prior softfloor d8:7).
 
-## Steals applied (router-gated)
+## Priors applied (router-gated)
 
 1. Softfloor cow curve → boatlee/kaito (d8=8)
 2. `late_dump_day` / `berry_land2_day` median across softfloor+top5+elite
@@ -32,7 +32,7 @@ Boatlee/kaito cow median: d6:3 → d7:6 → **d8:8** (faster than prior softfloo
 
 ## Eval
 
-- mean30 (before this steal pass): **81,322** · plot3 6/30 · cows@d10 3.5
+- mean30 (before this prior pass): **81,322** · plot3 6/30 · cows@d10 3.5
 - After wiring (densify-safe / softfloor-routed): densify guards **91.8k** unchanged; mean30 **81,322** unchanged (most mean30 seeds are EARLY_BERRY densify and skip the router); softfloor **~81.2k**
 
-Mean30 is densify-dominated — softfloor schedule steals barely move it. Ladder H2H / softfloor panel is the right gauge for these priors.
+Mean30 is densify-dominated — softfloor schedule priors barely move it. Ladder H2H / softfloor panel is the right gauge for these priors.

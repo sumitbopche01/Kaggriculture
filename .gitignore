@@ -14,5 +14,4 @@ kaggle.json
 tune/optuna.db
 tune/_*
 analysis/*.csv
-opponents/frozen_*/
-opponents/_download/
+opponents/

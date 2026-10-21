@@ -1,15 +1,15 @@
 """Schedule priors mined from strong ladder / top-player replays.
 
 `analysis/mine_schedules.py` writes `schedules_by_archetype_*.json`.
-This module loads those medians so policy can steal hire/land/dump/herd
+This module loads those medians so policy can follow hire/land/dump/herd
 timing instead of only tuning against starter.
 
 Corpora (2026-08-21):
   - elite / ladder85k: land2≈10.5, cows≈9.5, dump≈27.5, hire thick early
   - top5: land2≈10, berry≈32, dump≈29, full crew≈d7
   - softfloor $100k: land2≈10, cows≈8, berry≈35, dump≈28, hands≈13
-  - Live H2H boatlee/kaito: cows d6:3 → d7:6 → d8:8; land [6,10]; dump d29
-  - Live H2H hamburger: cows@10=6, berry≈39, land [7,10], hands@8≈11
+  - Live ladder, herd-heavy: cows d6:3 → d7:6 → d8:8; land [6,10]; dump d29
+  - Live ladder, berry-heavy: cows@10=6, berry≈39, land [7,10], hands@8≈11
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ _TOP5 = ROOT / "analysis" / "schedules_by_archetype_top5.json"
 _DEFAULT = ROOT / "analysis" / "schedules_by_archetype.json"
 DEFAULT_PATH = _ELITE if _ELITE.is_file() else _DEFAULT
 
-# Post-land1 herd ramp: boatlee_v16 / kaito_v27 live median (5 seeds).
+# Post-land1 herd ramp: live ladder median (5 seeds).
 # Softfloor router only; densify printers stay off this curve.
 _SOFTFLOOR_COW_BY_DAY: dict[int, int] = {
     0: 3,
@@ -134,7 +134,7 @@ def softfloor_cow_target_day(day: int, cap: int = 8) -> int:
 
 
 def softfloor_hire_target_day(day: int, default: int = 9) -> int:
-    """Top5/hamburger-style crew on softfloor boards (full crew ≈ d7–8)."""
+    """Softfloor crew target (full crew ≈ d7–8)."""
     # Prefer top5 curve (thicker than softfloor early hire which crashes densify).
     for path in (_TOP5, _ELITE):
         if not path.is_file():

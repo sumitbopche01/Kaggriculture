@@ -126,7 +126,7 @@ Dominant softfloor cause (Phase 0): **`ROUTER_OFF`** (6/9). Densify mode_on shou
 ## Phase 3 outcome
 
 - Post-plot3 berry sprint **reverted** (seed 33 mean crash, berry@d16 fell).
-- Existing `land2` hire spike retained; no densify-safe fill steal found this pass.
+- Existing `land2` hire spike retained; no densify-safe fill change found this pass.
 
 ## Ladder keep/revert (mandatory)
 
@@ -148,6 +148,6 @@ Skipped — EARLY_BERRY softfloor already plants berry before/at land1; land1 pa
 
 **Tried:** plant-under-stress / split-crew plant slots on `n_quads≥3`. Empty@d16 improved (20→10–16), berry↑, but scores −4–11k on those seeds; softfloor mean dipped. Phantom-hire “fix” aborted densify (−70k) — daily rehire is required by the game.
 
-**Keep:** Phase 1–2 only (router UNKNOWN@14 + softfloor shed-buy + packed/hollow helpers). No densify-3 field steal yet.
+**Keep:** Phase 1–2 only (router UNKNOWN@14 + softfloor shed-buy + packed/hollow helpers). No densify-3 field change yet.
 
 **Next package candidate:** earlier hollow buy (thinner stand at land2) so densify-3 water debt is manageable — fill after buy only works when stand isn’t already maxed.

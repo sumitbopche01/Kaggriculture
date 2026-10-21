@@ -1,4 +1,4 @@
-# Plot-3 steal from top / softfloor winners (2026-08-21)
+# Plot-3 timing from top / softfloor winners (2026-08-21)
 
 ## Elite schedule (who bought 3rd land)
 
@@ -35,7 +35,7 @@ Softfloor sample before fix: **plot3 2/9**, often cows@d10=4–6 but stay 2q.
 
 Miss traces (`analysis/kaggle_eps/miss_traces.json`): same pattern — land1 @d6, stall 2q, cows~2–3 @d10.
 
-## Steal landed
+## Change landed
 
 1. `_softfloor_calendar_land_ready` — day∈[land2_min, hollow_max], empty≥20, cows≥6, melon/berry/tomato stand
 2. Bypass `land_blocked_by_board_fill` when calendar ready
@@ -68,7 +68,7 @@ Seed **33** smoking gun (shop unlocks are path-dependent):
 - **frontier**: pizza+bakery → plant berry from d6 → smoothie unlocks → 172k, empty@d16=2, cows=8
 - **us**: pizza+pet → tomato densify → ice cream → ~64k, berry@d16=0, hollow
 
-## Steals tried (this session)
+## Changes tried (this session)
 
 1. **Post-land1 herd burst** toward 6–8 cows — raised plot3 count but crashed densify 7/55 and softfloor mean (~80k→73k). Left off (`post_land2_cow_day_max=-1`). Curve coded in `brain.schedules.softfloor_cow_target_day`.
 2. **Speculative berry** before berry shops — buys+plants work on seed 33 (berry@d16→14) but densify 55 crashed and softfloor mean did not lift. Left off (`softfloor_speculative_berry=0`); code path retained for map-router.
@@ -101,4 +101,4 @@ Policy: `_softfloor_mode` adds labor gate; enables `softfloor_speculative_berry`
 
 ### Landed earlier: post-plot-3 crew + seed fill
 - `MAX_HANDS=13`; `_land2_crew_spike` when 3q + empty≥16
-- Softfloor mean was **~80.6k** plot3 **3/9** before router steals
+- Softfloor mean was **~80.6k** plot3 **3/9** before router priors

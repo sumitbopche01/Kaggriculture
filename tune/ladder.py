@@ -261,9 +261,10 @@ def main() -> None:
     p.add_argument("--seedCount", type=int, default=0, help="0 = all in seedSet")
     p.add_argument(
         "--opponents",
-        default="frozen_73k6,ecobot_v2,structured,frontier_soil",
-        help="Comma list. Fair defaults exclude replay/compressed bots. "
-        "structured + frontier_soil are strong public policies that beat us. "
+        default="starter,frozen_73k6",
+        help="Comma list. Default is starter plus frozen_73k6 (rebuilt from "
+        "git 5f379de) so the ladder runs without downloaded bots. "
+        "After tune.fetch_opponents, add ecobot_v2,structured,frontier_soil. "
         "Add deterministic for ceiling (0%% WR expected).",
     )
     p.add_argument(

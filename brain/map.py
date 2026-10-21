@@ -10,7 +10,7 @@ MapStrategy = Literal["UNKNOWN", "EARLY_BERRY", "LATE_BERRY", "MILK_STACK", "LAN
 
 EGG_SHOPS = frozenset({"BAKERY", "BRUNCH_SPOT"})
 
-# Archetypes that may take softfloor schedule steals (herd / speculative berry).
+# Archetypes that may use softfloor schedule priors (herd / speculative berry).
 # EARLY_BERRY densify printers are explicitly excluded.
 SOFTFLOOR_STRATEGIES = frozenset({"LATE_BERRY", "LAND_SPRINT", "UNKNOWN", "MILK_STACK"})
 
@@ -145,7 +145,7 @@ def softfloor_mode_active(
     strategy: MapStrategy,
     params: dict[str, int | float],
 ) -> bool:
-    """Route softfloor schedule steals (herd ramp, speculative berry).
+    """Route softfloor schedule priors (herd ramp, speculative berry).
 
     Densify EARLY_BERRY stays off. UNKNOWN uses fill hollow (empty≥16) so
     softfloor post-land1 dawns keep routing after empty drops 25→17.

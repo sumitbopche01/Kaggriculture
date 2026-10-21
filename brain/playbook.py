@@ -105,7 +105,7 @@ def berry_opened_first(
     """True when a berry shop unlocked at or before the first milk shop.
 
     Ice cream is both families; same-day counts as berries first so a
-    later pizza cannot steal the primary crop.
+    later pizza cannot take the primary crop.
     """
     if first_berry_day is None:
         return False
